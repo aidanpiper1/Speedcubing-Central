@@ -63,15 +63,13 @@ export function createApp() {
     res.status(404).json({ error: 'Not found' });
   });
 
-  // In production, serve the built React app and let the client-side router handle all non-API paths.
-  if (isProd) {
-    const clientDist = path.resolve(__dirname, '../../client/dist');
-    if (fs.existsSync(clientDist)) {
-      app.use(express.static(clientDist));
-      app.get('*', (_req, res) => {
-        res.sendFile(path.join(clientDist, 'index.html'));
-      });
-    }
+  // Serve the built React app for all non-API routes (production and any env where the dist exists).
+  const clientDist = path.resolve(__dirname, '../../client/dist');
+  if (fs.existsSync(clientDist)) {
+    app.use(express.static(clientDist));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(clientDist, 'index.html'));
+    });
   }
 
   // Centralized error handler — never leaks stack traces.
