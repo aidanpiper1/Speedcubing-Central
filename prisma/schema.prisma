@@ -1,0 +1,169 @@
+// Prisma schema for Speedcubing Central
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  GUEST
+  USER
+  ADMIN
+}
+
+enum Penalty {
+  NONE
+  PLUS2
+  DNF
+}
+
+enum BattleStatus {
+  WAITING
+  ACTIVE
+  FINISHED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  passwordHash String?
+  wcaId        String?  @unique
+  displayName  String
+  country      String?
+  avatarUrl    String?
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+
+  sessions      Session[]
+  solves        Solve[]
+  dailyResults  DailyResult[]
+  goals         UserGoal[]
+  battleParts   BattleParticipant[]
+  letterPairs   LetterPair[]
+  algProgress   AlgProgress[]
+
+  @@index([wcaId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  name      String
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  solves Solve[]
+
+  @@index([userId, eventId])
+}
+
+model Solve {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  time      Int // milliseconds
+  penalty   Penalty  @default(NONE)
+  scramble  String
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model DailyScramble {
+  id       String   @id @default(cuid())
+  date     DateTime @db.Date
+  eventId  String
+  scramble String
+
+  results DailyResult[]
+
+  @@unique([date, eventId])
+}
+
+model DailyResult {
+  id              String   @id @default(cuid())
+  userId          String
+  dailyScrambleId String
+  time            Int
+  penalty         Penalty  @default(NONE)
+  createdAt       DateTime @default(now())
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyScramble DailyScramble @relation(fields: [dailyScrambleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dailyScrambleId])
+}
+
+model BattleRoom {
+  id        String       @id @default(cuid())
+  code      String       @unique
+  scramble  String
+  eventId   String
+  status    BattleStatus @default(WAITING)
+  createdAt DateTime     @default(now())
+
+  participants BattleParticipant[]
+}
+
+model BattleParticipant {
+  id         String    @id @default(cuid())
+  roomId     String
+  userId     String?
+  guestName  String?
+  time       Int?
+  penalty    Penalty?
+  finishedAt DateTime?
+  ready      Boolean   @default(false)
+
+  room BattleRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+}
+
+model UserGoal {
+  id         String @id @default(cuid())
+  userId     String
+  eventId    String
+  targetTime Int // milliseconds
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+}
+
+// BLD trainer: a user's personalized letter-pair association
+model LetterPair {
+  id     String @id @default(cuid())
+  userId String
+  pair   String // e.g. "AB"
+  image  String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pair])
+}
+
+// Spaced repetition progress for algorithm trainer (SM-2)
+model AlgProgress {
+  id           String   @id @default(cuid())
+  userId       String
+  setId        String // OLL, PLL, ...
+  caseId       String
+  easeFactor   Float    @default(2.5)
+  intervalDays Int      @default(0)
+  repetitions  Int      @default(0)
+  dueAt        DateTime @default(now())
+  lastReviewed DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, setId, caseId])
+}

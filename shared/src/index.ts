@@ -1,0 +1,172 @@
+// Shared types and constants used by both the client and the server.
+
+export * from './averaging.js';
+
+export type Role = 'GUEST' | 'USER' | 'ADMIN';
+export type Penalty = 'NONE' | 'PLUS2' | 'DNF';
+export type BattleStatus = 'WAITING' | 'ACTIVE' | 'FINISHED';
+
+export interface WcaEvent {
+  id: string;
+  name: string;
+  scrambowType: string; // passed to scrambow's Scrambow().setType(); '' = no scrambow support
+}
+
+export const WCA_EVENTS: WcaEvent[] = [
+  { id: '222', name: '2x2', scrambowType: '222' },
+  { id: '333', name: '3x3', scrambowType: '333' },
+  { id: '444', name: '4x4', scrambowType: '444' },
+  { id: '555', name: '5x5', scrambowType: '555' },
+  { id: '666', name: '6x6', scrambowType: '666' },
+  { id: '777', name: '7x7', scrambowType: '777' },
+  { id: '333oh', name: '3x3 One-Handed', scrambowType: '333' },
+  { id: '333bf', name: '3x3 Blindfolded', scrambowType: '333bf' },
+  { id: '444bf', name: '4x4 Blindfolded', scrambowType: '444bf' },
+  { id: '555bf', name: '5x5 Blindfolded', scrambowType: '555bf' },
+  { id: 'minx', name: 'Megaminx', scrambowType: 'minx' },
+  { id: 'pyram', name: 'Pyraminx', scrambowType: 'pyram' },
+  { id: 'clock', name: 'Clock', scrambowType: 'clock' },
+  { id: 'skewb', name: 'Skewb', scrambowType: 'skewb' },
+  { id: 'sq1', name: 'Square-1', scrambowType: 'sq1' },
+];
+
+export const UNOFFICIAL_EVENTS: WcaEvent[] = [
+  { id: 'kilominx', name: 'Kilominx', scrambowType: '' },
+  { id: 'fto', name: 'FTO', scrambowType: '' },
+  { id: 'redi_cube', name: 'Redi Cube', scrambowType: '' },
+];
+
+export const ALL_EVENTS: WcaEvent[] = [...WCA_EVENTS, ...UNOFFICIAL_EVENTS];
+
+// Collapse any run of whitespace to a single space (some generators double-space).
+export function normalizeScramble(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+export const EVENT_IDS = ALL_EVENTS.map((e) => e.id);
+
+export function getEvent(id: string): WcaEvent | undefined {
+  return ALL_EVENTS.find((e) => e.id === id);
+}
+
+// ---- API DTOs ----
+
+export interface PublicUser {
+  id: string;
+  email?: string | null;
+  wcaId?: string | null;
+  displayName: string;
+  country?: string | null;
+  avatarUrl?: string | null;
+  role: Role;
+  createdAt: string;
+}
+
+export interface SolveDTO {
+  id: string;
+  sessionId: string;
+  userId: string;
+  time: number; // milliseconds
+  penalty: Penalty;
+  scramble: string;
+  createdAt: string;
+}
+
+export interface SessionDTO {
+  id: string;
+  userId: string;
+  eventId: string;
+  name: string;
+  createdAt: string;
+  solveCount?: number;
+}
+
+export interface GoalDTO {
+  eventId: string;
+  targetTime: number;
+}
+
+export interface DailyScrambleDTO {
+  id: string;
+  date: string;
+  eventId: string;
+  scramble: string;
+}
+
+export interface DailyLeaderboardEntry {
+  rank: number;
+  userId: string;
+  displayName: string;
+  wcaId?: string | null;
+  time: number;
+  penalty: Penalty;
+}
+
+export interface BattleParticipantDTO {
+  id: string;
+  userId?: string | null;
+  name: string;
+  ready: boolean;
+  time?: number | null;
+  penalty?: Penalty | null;
+  finishedAt?: string | null;
+}
+
+export interface BattleRoomDTO {
+  id: string;
+  code: string;
+  scramble: string;
+  eventId: string;
+  status: BattleStatus;
+  participants: BattleParticipantDTO[];
+}
+
+// ---- Socket.io event payloads ----
+
+export interface ServerToClientEvents {
+  room_state: (room: BattleRoomDTO) => void;
+  both_ready: (payload: { scramble: string }) => void;
+  scramble: (payload: { scramble: string }) => void;
+  opponent_finished: (payload: { participantId: string; time: number; penalty: Penalty }) => void;
+  room_result: (payload: BattleResult) => void;
+  error_msg: (payload: { message: string }) => void;
+}
+
+export interface ClientToServerEvents {
+  join_room: (payload: { code: string; userId?: string; name: string }) => void;
+  ready: (payload: { code: string }) => void;
+  solve_complete: (payload: { code: string; time: number; penalty: Penalty }) => void;
+  leave_room: (payload: { code: string }) => void;
+  rematch: (payload: { code: string }) => void;
+}
+
+export interface BattleResult {
+  roomId: string;
+  winnerParticipantId: string | null; // null means draw
+  results: BattleParticipantDTO[];
+}
+
+// Effective solve time given a penalty. DNF returns Infinity.
+export function effectiveTime(time: number, penalty: Penalty): number {
+  if (penalty === 'DNF') return Infinity;
+  if (penalty === 'PLUS2') return time + 2000;
+  return time;
+}
+
+// Format milliseconds as a cube timer string, e.g. 12345 -> "12.35", 73210 -> "1:13.21".
+// `decimals` controls displayed precision (2 = centiseconds, 3 = milliseconds).
+export function formatTime(
+  ms: number | null | undefined,
+  penalty: Penalty = 'NONE',
+  decimals = 2,
+): string {
+  if (penalty === 'DNF') return 'DNF';
+  if (ms === null || ms === undefined || !isFinite(ms)) return 'DNF';
+  const withPenalty = penalty === 'PLUS2' ? ms + 2000 : ms;
+  const totalSeconds = withPenalty / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const secStr = seconds.toFixed(decimals).padStart(decimals + 3, '0');
+  const base = minutes > 0 ? `${minutes}:${secStr}` : seconds.toFixed(decimals);
+  return penalty === 'PLUS2' ? `${base}+` : base;
+}

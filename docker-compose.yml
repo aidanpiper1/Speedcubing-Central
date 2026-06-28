@@ -1,0 +1,20 @@
+# Convenience Postgres for local development.
+#   docker compose up -d
+# Then set DATABASE_URL in .env to:
+#   postgresql://postgres:postgres@localhost:5432/speedcubing?schema=public
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: scc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: speedcubing
+    ports:
+      - '5432:5432'
+    volumes:
+      - scc-pgdata:/var/lib/postgresql/data
+
+volumes:
+  scc-pgdata:

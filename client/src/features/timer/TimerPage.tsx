@@ -1,0 +1,411 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
+import { formatTime, getEvent, type Penalty, type SolveDTO } from '@scc/shared';
+import { useSettings } from '../../store/settings';
+import { useAuth } from '../../store/auth';
+import { useUi } from '../../store/ui';
+import { EventSelector } from '../../components/ui';
+import { Icon } from '../../components/Icon';
+import { ScrambleImage } from '../../components/ScrambleImage';
+import { useTimerEngine } from './useTimerEngine';
+import { useTimerData } from './useTimerData';
+import { useScrambler } from './useScrambler';
+import { singleStats, makeAverageView, type AvgSize, type SolveAverage } from './stats';
+import { StatsTable } from './StatsTable';
+import { PenaltyButtons } from './PenaltyButtons';
+import { TimerSettings } from './TimerSettings';
+import { SessionManager } from './SessionManager';
+import { SolveDetail } from './SolveDetail';
+import { AverageDetail } from './AverageDetail';
+import { copyText, formatSolveCopy } from './copy';
+
+const SOLVE_GRID = 'grid grid-cols-[1.8rem_5rem_3.6rem_3.6rem_1fr] gap-2 items-center';
+
+function scrambleFontSize(scramble: string): string {
+  const n = scramble.length;
+  if (n <= 30) return 'text-4xl';
+  if (n <= 50) return 'text-3xl';
+  if (n <= 80) return 'text-2xl';
+  if (n <= 140) return 'text-xl';
+  return 'text-lg';
+}
+
+// Parse a time string. For pure-digit inputs (no . or :), use precision to
+// interpret: the last `precision` digits are the fractional part.
+// e.g. precision=2, "1258" → 12.58s; "12684" → 1:26.84
+function parseTimeInput(raw: string, precision: number): { time: number; penalty: Penalty } | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^dnf$/i.test(t)) return { time: 0, penalty: 'DNF' };
+
+  let penalty: Penalty = 'NONE';
+  let s = t;
+  if (s.endsWith('+')) {
+    penalty = 'PLUS2';
+    s = s.slice(0, -1);
+  }
+
+  let ms: number;
+
+  if (/^\d+$/.test(s) && precision > 0) {
+    const frac = parseInt(s.slice(-precision).padStart(precision, '0'), 10);
+    const intStr = s.slice(0, -precision) || '0';
+    const intSec = parseInt(intStr, 10);
+    const minutes = Math.floor(intSec / 100);
+    const seconds = intSec % 100;
+    ms = (minutes * 60 + seconds) * 1000 + frac * Math.pow(10, 3 - precision);
+  } else if (/^\d+$/.test(s) && precision === 0) {
+    ms = parseInt(s, 10) * 1000;
+  } else if (s.includes(':')) {
+    const [m, sec] = s.split(':');
+    ms = (parseInt(m, 10) * 60 + parseFloat(sec)) * 1000;
+  } else {
+    ms = parseFloat(s) * 1000;
+  }
+
+  if (isNaN(ms) || ms < 0) return null;
+  return { time: Math.round(ms), penalty };
+}
+
+export default function TimerPage() {
+  const settings = useSettings();
+  const { inspection, inspectionDirection, inspectionVoice, holdToStart, holdDuration, entryMode, timerUpdate, solvePrecision, startSound } = settings;
+  const { user } = useAuth();
+  const { focusMode } = useUi();
+  const event = settings.currentEvent;
+  const data = useTimerData(event);
+  const scr = useScrambler(event);
+
+  const [typed, setTyped] = useState('');
+  const [showSessions, setShowSessions] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [detailIndex, setDetailIndex] = useState<number | null>(null);
+  const [avgView, setAvgView] = useState<SolveAverage | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const anyModalOpen = showSessions || showSettings || detailIndex !== null || avgView !== null;
+
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  const onComplete = useCallback(
+    async (timeMs: number, penalty: Penalty) => {
+      if (!data.currentId) await data.createSession(`${getEvent(event)?.name ?? event} Session`);
+      await data.addSolve(timeMs, penalty, scr.scramble);
+      scr.advance();
+    },
+    [data, scr, event],
+  );
+
+  const engine = useTimerEngine({
+    inspection,
+    inspectionDirection,
+    inspectionVoice,
+    holdToStart,
+    holdDuration,
+    startSound,
+    enabled: entryMode === 'keyboard' && !anyModalOpen,
+    onComplete,
+  });
+
+  const stats = useMemo(() => singleStats(data.solves), [data.solves]);
+  const newest = data.solves[0];
+
+  const runningStr = (ms: number) => {
+    if (timerUpdate === 'hidden') return 'solving…';
+    const dec = timerUpdate === 'seconds' ? 0 : timerUpdate === 'deciseconds' ? 1 : 2;
+    return formatTime(Math.round(ms), 'NONE', dec);
+  };
+
+  const display = useMemo(() => {
+    const p = engine.phase;
+    if (inspection && (p === 'inspecting' || p === 'holding' || p === 'ready')) {
+      if (inspectionDirection === 'up') return String(Math.floor(engine.inspectionElapsed / 1000));
+      const rem = engine.inspectionRemaining;
+      if (rem > 0) return String(Math.ceil(rem / 1000));
+      return rem > -2000 ? '+2' : 'DNF';
+    }
+    if (p === 'running') return runningStr(engine.elapsed);
+    if (p === 'stopped' && newest) return formatTime(newest.time, newest.penalty, solvePrecision);
+    if ((p === 'holding' || p === 'ready') && !inspection) return formatTime(0, 'NONE', solvePrecision);
+    if (newest) return formatTime(newest.time, newest.penalty, solvePrecision);
+    return formatTime(0, 'NONE', solvePrecision);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine.phase, engine.elapsed, engine.inspectionElapsed, engine.inspectionRemaining, newest, inspection, inspectionDirection, timerUpdate, solvePrecision]);
+
+  const colorClass = (() => {
+    const p = engine.phase;
+    if (p === 'ready') return 'text-green-500';
+    if (p === 'holding') return inspection ? 'text-yellow-400' : 'text-red-500';
+    if (p === 'inspecting') return 'text-gray-800 dark:text-white';
+    return 'text-gray-900 dark:text-gray-100';
+  })();
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => undefined);
+  }
+
+  function addTyped() {
+    const parsed = parseTimeInput(typed, solvePrecision);
+    if (!parsed) return;
+    onComplete(parsed.time, parsed.penalty);
+    setTyped('');
+  }
+
+  const openAverage = useCallback(
+    (size: AvgSize, startIndex: number) => {
+      const view = makeAverageView(data.solves, startIndex, size);
+      if (view) setAvgView(view);
+    },
+    [data.solves],
+  );
+
+  const hintText = (() => {
+    const p = engine.phase;
+    if (p === 'idle') return 'Hold Space (or touch & hold), release to start';
+    if (p === 'inspecting') return 'Inspecting — hold Space to get ready';
+    if (p === 'holding') return 'Keep holding…';
+    if (p === 'ready') return 'Release to start!';
+    if (p === 'running') return 'Press Space / tap to stop';
+    if (p === 'stopped') return 'Solve saved · Esc cancels an accidental start';
+    return '';
+  })();
+
+  const tool =
+    'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-card-hover dark:hover:bg-border dark:text-gray-200';
+
+  const typedParsed = useMemo(() => parseTimeInput(typed, solvePrecision), [typed, solvePrecision]);
+  const entryDisplay = typed
+    ? typedParsed
+      ? formatTime(typedParsed.time, typedParsed.penalty, solvePrecision)
+      : typed
+    : formatTime(0, 'NONE', solvePrecision);
+  const entryColorClass = typed
+    ? typedParsed
+      ? 'text-gray-900 dark:text-gray-100'
+      : 'text-red-400'
+    : 'text-muted';
+
+  return (
+    // On desktop the outer div fills exactly the content area height (100dvh minus the p-8 wrapper = 4rem).
+    // On mobile, height is auto and the page scrolls normally.
+    <div className="flex flex-col gap-3 md:h-[calc(100dvh-2rem)]">
+
+      {/* Controls bar — shift right when focus mode hides the sidebar so the restore button doesn't overlap */}
+      <div className={clsx('flex flex-wrap items-center gap-2 shrink-0', focusMode && 'md:pl-10')}>
+        <EventSelector value={event} onChange={settings.setCurrentEvent} />
+        <select className="input max-w-[180px]" value={data.currentId ?? ''} onChange={(e) => data.setCurrentId(e.target.value)}>
+          {data.sessions.length === 0 && <option value="">No sessions</option>}
+          {data.sessions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.solveCount ?? 0})
+            </option>
+          ))}
+        </select>
+        <button className={tool} onClick={() => setShowSessions(true)}>
+          <Icon name="book" size={16} /> Sessions
+        </button>
+        <button className={tool} onClick={() => setShowSettings(true)}>
+          <Icon name="gear" size={16} /> Settings
+        </button>
+        <button className={clsx(tool, 'ml-auto')} onClick={toggleFullscreen} title="Fullscreen">
+          <Icon name={isFullscreen ? 'x' : 'plus'} size={16} />
+          {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        </button>
+      </div>
+
+      {!user && (
+        <div className="shrink-0 text-xs text-muted bg-card border border-border rounded-lg px-3 py-2">
+          You're not logged in — solves are saved locally in this browser only.
+        </div>
+      )}
+
+      {/* 2-column layout: left (scramble + timer + last-solve) | right (stats + solves) */}
+      <div className="flex flex-col md:flex-row gap-3 flex-1 min-h-0">
+
+        {/* LEFT column */}
+        <div className="flex flex-col gap-3 md:flex-[3] min-h-0">
+
+          {/* Scramble card */}
+          <div className="card p-5 shrink-0 flex flex-col items-center gap-3">
+            <ScrambleImage eventId={event} scramble={scr.scramble} />
+            <div className={`${scrambleFontSize(scr.scramble)} font-mono tracking-wide break-words w-full text-center`}>
+              {scr.loading ? <span className="text-muted text-base">Scrambling…</span> : scr.scramble || '—'}
+            </div>
+            <button className="text-xs text-accent inline-flex items-center gap-1" onClick={() => scr.refresh()}>
+              <Icon name="refresh" size={13} /> new scramble
+            </button>
+          </div>
+
+          {/* Timer card — fills remaining vertical space */}
+          {entryMode === 'keyboard' ? (
+            <div
+              className="card flex-1 min-h-0 select-none touch-none flex flex-col items-center justify-center cursor-pointer"
+              onTouchStart={(e) => { e.preventDefault(); if (!anyModalOpen) engine.press(); }}
+              onTouchEnd={(e) => { e.preventDefault(); if (!anyModalOpen) engine.release(); }}
+            >
+              <div
+                className={clsx('font-mono font-bold tabular-nums transition-colors leading-none w-full text-center px-8', colorClass)}
+                style={{ fontSize: 'clamp(3rem, 8vw, 9rem)' }}
+              >
+                {display}
+              </div>
+              <p className="text-muted text-sm mt-6 text-center px-4">{hintText}</p>
+            </div>
+          ) : (
+            <div className="card flex-1 min-h-0 flex flex-col items-center justify-center gap-6">
+              <div
+                className={clsx('font-mono font-bold tabular-nums leading-none w-full text-center px-8', entryColorClass)}
+                style={{ fontSize: 'clamp(3rem, 8vw, 9rem)' }}
+              >
+                {entryDisplay}
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  className="input font-mono text-center text-xl w-40"
+                  placeholder="10.00"
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addTyped()}
+                  autoFocus
+                />
+                <button className="btn-primary" onClick={addTyped}>Add solve</button>
+              </div>
+            </div>
+          )}
+
+          {/* Last solve + penalty */}
+          {newest && (
+            <div className="card p-4 shrink-0 flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-sm text-muted">
+                Last solve: <span className="font-mono text-gray-900 dark:text-gray-100">{formatTime(newest.time, newest.penalty, solvePrecision)}</span>
+              </span>
+              <PenaltyButtons penalty={newest.penalty} onChange={(p) => data.updatePenalty(newest.id, p)} size="sm" />
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT column */}
+        <div className="flex flex-col gap-3 md:flex-[2] min-h-0">
+
+          {/* Statistics */}
+          <div className="card p-5 shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">Statistics</h3>
+              <div className="text-sm text-muted">
+                <span className="font-mono text-gray-900 dark:text-gray-100">{stats.count}</span> solves
+              </div>
+            </div>
+            <StatsTable solves={data.solves} onOpenSolve={(i) => setDetailIndex(i)} onOpenAverage={openAverage} />
+          </div>
+
+          {/* Solves list — fills remaining vertical space, scrolls internally */}
+          <div className="card p-5 flex flex-col flex-1 min-h-0">
+            <h3 className="font-bold text-lg mb-3 shrink-0">Solves ({data.solves.length})</h3>
+            {data.solves.length === 0 ? (
+              <p className="text-muted text-sm">No solves yet. Start the timer.</p>
+            ) : (
+              <>
+                <div className={`${SOLVE_GRID} text-xs font-semibold text-muted px-1 pb-1.5 border-b border-border shrink-0`}>
+                  <span className="text-right">#</span>
+                  <span>single</span>
+                  <span className="text-right">ao5</span>
+                  <span className="text-right">ao12</span>
+                  <span />
+                </div>
+                <div className="divide-y divide-border/60 overflow-y-auto flex-1 min-h-0">
+                  {data.solves.map((s, i) => (
+                    <SolveRow
+                      key={s.id}
+                      index={i}
+                      solve={s}
+                      solves={data.solves}
+                      precision={solvePrecision}
+                      onOpenSolve={() => setDetailIndex(i)}
+                      onOpenAverage={openAverage}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <SessionManager open={showSessions} onClose={() => setShowSessions(false)} data={data} event={event} />
+      <TimerSettings open={showSettings} onClose={() => setShowSettings(false)} />
+      {detailIndex !== null && (
+        <SolveDetail
+          open
+          onClose={() => setDetailIndex(null)}
+          solves={data.solves}
+          index={detailIndex}
+          event={event}
+          onUpdatePenalty={data.updatePenalty}
+          onDelete={data.deleteSolve}
+          onOpenAverage={(v) => setAvgView(v)}
+        />
+      )}
+      {avgView && <AverageDetail view={avgView} event={event} onClose={() => setAvgView(null)} />}
+    </div>
+  );
+}
+
+function SolveRow({
+  index,
+  solve,
+  solves,
+  precision,
+  onOpenSolve,
+  onOpenAverage,
+}: {
+  index: number;
+  solve: SolveDTO;
+  solves: SolveDTO[];
+  precision: number;
+  onOpenSolve: () => void;
+  onOpenAverage: (size: AvgSize, startIndex: number) => void;
+}) {
+  const fmtAvg = (v: number | null) => (v === null ? '—' : !isFinite(v) ? 'DNF' : formatTime(Math.round(v), 'NONE', precision));
+  const ao5 = makeAverageView(solves, index, 5);
+  const ao12 = makeAverageView(solves, index, 12);
+
+  return (
+    <div className={`${SOLVE_GRID} px-1 py-2 text-sm`}>
+      <span className="text-muted text-xs text-right">{solves.length - index}.</span>
+      <button
+        onClick={onOpenSolve}
+        className={clsx('text-left font-mono font-semibold hover:text-accent', solve.penalty === 'DNF' && 'text-red-400')}
+      >
+        {formatTime(solve.time, solve.penalty, precision)}
+      </button>
+      <button
+        onClick={() => ao5 && onOpenAverage(5, index)}
+        disabled={!ao5}
+        className="font-mono text-xs text-muted hover:text-accent disabled:opacity-30 disabled:hover:text-muted text-right"
+        title="ao5"
+      >
+        {ao5 ? fmtAvg(ao5.value) : '·'}
+      </button>
+      <button
+        onClick={() => ao12 && onOpenAverage(12, index)}
+        disabled={!ao12}
+        className="font-mono text-xs text-muted hover:text-accent disabled:opacity-30 disabled:hover:text-muted text-right"
+        title="ao12"
+      >
+        {ao12 ? fmtAvg(ao12.value) : '·'}
+      </button>
+      <button
+        onClick={() => copyText(formatSolveCopy(solve, precision), 'Solve copied')}
+        title="Copy solve"
+        className="text-muted hover:text-accent justify-self-end"
+      >
+        <Icon name="copy" size={14} />
+      </button>
+    </div>
+  );
+}

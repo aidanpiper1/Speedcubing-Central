@@ -1,0 +1,88 @@
+import express, { type Request, type Response, type NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import { ZodError } from 'zod';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import { env, isProd } from './env.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+import authRouter from './routes/auth.js';
+import sessionsRouter from './routes/sessions.js';
+import solvesRouter from './routes/solves.js';
+import dailyRouter from './routes/daily.js';
+import wcaRouter from './routes/wca.js';
+import profileRouter from './routes/profile.js';
+import adminRouter from './routes/admin.js';
+import battleRouter from './routes/battle.js';
+import bldRouter from './routes/bld.js';
+import algRouter from './routes/alg.js';
+
+export function createApp() {
+  const app = express();
+
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(
+    cors({
+      origin: env.FRONTEND_URL,
+      credentials: true,
+    }),
+  );
+  app.use(express.json({ limit: '1mb' }));
+  app.use(cookieParser());
+
+  // Rate limit all API routes.
+  const limiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api', limiter);
+
+  app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+  app.use('/api/auth', authRouter);
+  app.use('/api/sessions', sessionsRouter);
+  app.use('/api/solves', solvesRouter);
+  app.use('/api/daily', dailyRouter);
+  app.use('/api/wca', wcaRouter);
+  app.use('/api/profile', profileRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/api/battle', battleRouter);
+  app.use('/api/bld', bldRouter);
+  app.use('/api/alg', algRouter);
+
+  // 404 for unknown API routes
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
+  // In production, serve the built React app and let the client-side router handle all non-API paths.
+  if (isProd) {
+    const clientDist = path.resolve(__dirname, '../../client/dist');
+    if (fs.existsSync(clientDist)) {
+      app.use(express.static(clientDist));
+      app.get('*', (_req, res) => {
+        res.sendFile(path.join(clientDist, 'index.html'));
+      });
+    }
+  }
+
+  // Centralized error handler — never leaks stack traces.
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof ZodError) {
+      res.status(400).json({ error: 'Validation failed', details: err.flatten() });
+      return;
+    }
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    if (env.NODE_ENV !== 'test') console.error('[error]', message);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  return app;
+}
