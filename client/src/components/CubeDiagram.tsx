@@ -46,7 +46,7 @@ function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: numb
   el.puzzle = '3x3x3';
   el.visualization = 'PG3D';
   el.alg = '';
-  el.experimentalSetupAlg = invertAlg(alg);
+  el.experimentalSetupAlg = 'x2 ' + invertAlg(alg);
 }
 
 // OLL & COLL: top-down view — shows U-face orientation pattern + top-row side stickers.
@@ -108,7 +108,7 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30 }: { alg:
     el.puzzle = '3x3x3';
     el.visualization = 'PG3D';
     el.alg = '';
-    el.experimentalSetupAlg = invertAlg(alg);
+    el.experimentalSetupAlg = 'x2 ' + invertAlg(alg);
 
     const autoRotate = () => {
       if (!dragging.current) {
