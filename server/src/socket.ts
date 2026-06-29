@@ -48,6 +48,16 @@ async function buildRoomDTO(code: string): Promise<BattleRoomDTO | null> {
   };
 }
 
+async function deleteRoomIfEmpty(code: string): Promise<void> {
+  const room = await prisma.battleRoom.findUnique({
+    where: { code },
+    include: { participants: { select: { id: true } } },
+  });
+  if (room && room.participants.length === 0) {
+    await prisma.battleRoom.delete({ where: { id: room.id } });
+  }
+}
+
 export function attachSocket(server: HttpServer): IOServer {
   const io = new IOServer<ClientToServerEvents, ServerToClientEvents>(server, {
     cors: { origin: env.FRONTEND_URL, credentials: true },
@@ -281,6 +291,7 @@ export function attachSocket(server: HttpServer): IOServer {
         if (room?.status === 'ACTIVE') {
           await checkRoundCompletion(code);
         }
+        await deleteRoomIfEmpty(code);
         await emitRoomState(code);
         myCode = null;
       }),
@@ -288,9 +299,10 @@ export function attachSocket(server: HttpServer): IOServer {
 
     socket.on('disconnect', async () => {
       if (!myParticipantId || !myCode) return;
+      const code = myCode;
       try {
         const room = await prisma.battleRoom.findUnique({
-          where: { code: myCode },
+          where: { code },
           include: { participants: true },
         });
         if (room?.status === 'ACTIVE') {
@@ -300,16 +312,12 @@ export function attachSocket(server: HttpServer): IOServer {
               where: { id: myParticipantId },
               data: { finishedAt: new Date(), penalty: 'DNF', time: null },
             });
-            await checkRoundCompletion(myCode);
+            await checkRoundCompletion(code);
           }
-        } else {
-          // In waiting: just unready them so they don't block the next round start.
-          await prisma.battleParticipant.update({
-            where: { id: myParticipantId },
-            data: { ready: false },
-          });
         }
-        await emitRoomState(myCode);
+        await prisma.battleParticipant.deleteMany({ where: { id: myParticipantId } });
+        await deleteRoomIfEmpty(code);
+        await emitRoomState(code);
       } catch {
         /* room may be gone */
       }

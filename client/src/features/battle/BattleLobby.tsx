@@ -214,14 +214,7 @@ export default function BattleLobby() {
           <span className="text-xs text-muted">Refreshes every 5 s</span>
         </div>
 
-        {isLoading ? (
-          <div className="card p-6 text-center text-muted text-sm">Loading rooms…</div>
-        ) : publicRooms.length === 0 ? (
-          <div className="card p-8 text-center">
-            <div className="text-muted text-sm mb-3">No public rooms yet.</div>
-            <button className="btn-primary" onClick={() => setShowCreate(true)}>Create the first one</button>
-          </div>
-        ) : (
+        {!isLoading && publicRooms.length === 0 ? null : (
           <div className="space-y-2">
             {publicRooms.map((room) => (
               <div key={room.code} className="card p-4 flex items-center gap-4">

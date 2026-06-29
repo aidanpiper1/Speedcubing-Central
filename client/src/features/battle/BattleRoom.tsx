@@ -6,9 +6,118 @@ import { useAuth } from '../../store/auth';
 import { useSettings } from '../../store/settings';
 import { toast } from '../../store/toast';
 import { Icon } from '../../components/Icon';
+import { Modal } from '../../components/Modal';
 import { ScrambleImage } from '../../components/ScrambleImage';
 import { useTimerEngine } from '../timer/useTimerEngine';
 import { useBattleSocket, type RoundResult } from './useBattleSocket';
+
+function parseTimeInput(raw: string): number | null {
+  const s = raw.trim().replace(',', '.');
+  const colonMatch = s.match(/^(\d+):(\d{1,2})(?:\.(\d{1,3}))?$/);
+  if (colonMatch) {
+    const mins = parseInt(colonMatch[1], 10);
+    const secs = parseInt(colonMatch[2], 10);
+    const dec = colonMatch[3] ? parseInt(colonMatch[3].padEnd(3, '0'), 10) : 0;
+    return mins * 60000 + secs * 1000 + dec;
+  }
+  const dotMatch = s.match(/^(\d+)\.(\d{1,3})$/);
+  if (dotMatch) {
+    const secs = parseInt(dotMatch[1], 10);
+    const dec = parseInt(dotMatch[2].padEnd(3, '0'), 10);
+    return secs * 1000 + dec;
+  }
+  const digitsMatch = s.match(/^\d{1,8}$/);
+  if (digitsMatch) {
+    const n = parseInt(s, 10);
+    const cs = n % 100;
+    const totalSecs = Math.floor(n / 100);
+    return totalSecs * 1000 + cs * 10;
+  }
+  return null;
+}
+
+function BattleSettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const settings = useSettings();
+  return (
+    <Modal open={open} onClose={onClose} title="Battle Settings" size="sm">
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium">Inspection time</div>
+            <div className="text-xs text-muted">15-second WCA inspection before each solve</div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={settings.inspection}
+            onClick={() => settings.set({ inspection: !settings.inspection })}
+            className={clsx('relative w-10 h-6 rounded-full transition-colors shrink-0', settings.inspection ? 'bg-accent' : 'bg-card-hover')}
+          >
+            <span className={clsx('absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform', settings.inspection && 'translate-x-4')} />
+          </button>
+        </div>
+        {settings.inspection && (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">Count direction</div>
+              <div className="flex gap-1 rounded-lg bg-card-hover p-1">
+                {(['down', 'up'] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => settings.set({ inspectionDirection: v })}
+                    className={clsx('px-3 py-1 rounded text-xs font-medium transition-colors', settings.inspectionDirection === v ? 'bg-accent text-white' : 'text-muted hover:text-gray-200')}
+                  >
+                    {v === 'down' ? 'Count down' : 'Count up'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">Voice announcements</div>
+              <button
+                role="switch"
+                aria-checked={settings.inspectionVoice}
+                onClick={() => settings.set({ inspectionVoice: !settings.inspectionVoice })}
+                className={clsx('relative w-10 h-6 rounded-full transition-colors shrink-0', settings.inspectionVoice ? 'bg-accent' : 'bg-card-hover')}
+              >
+                <span className={clsx('absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform', settings.inspectionVoice && 'translate-x-4')} />
+              </button>
+            </div>
+          </>
+        )}
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">Time entry</div>
+          <div className="flex gap-1 rounded-lg bg-card-hover p-1">
+            {(['keyboard', 'typing'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => settings.set({ entryMode: v })}
+                className={clsx('px-3 py-1 rounded text-xs font-medium transition-colors', settings.entryMode === v ? 'bg-accent text-white' : 'text-muted hover:text-gray-200')}
+              >
+                {v === 'keyboard' ? 'Timer' : 'Type in'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {settings.entryMode === 'keyboard' && (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">Hold to start</div>
+              <div className="text-xs text-muted">Hold spacebar before releasing to start</div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={settings.holdToStart}
+              onClick={() => settings.set({ holdToStart: !settings.holdToStart })}
+              className={clsx('relative w-10 h-6 rounded-full transition-colors shrink-0', settings.holdToStart ? 'bg-accent' : 'bg-card-hover')}
+            >
+              <span className={clsx('absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform', settings.holdToStart && 'translate-x-4')} />
+            </button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
 
 // ── Small helpers ────────────────────────────────────────────────────────────
 
@@ -90,7 +199,9 @@ export default function BattleRoom() {
   const [submitted, setSubmitted] = useState(false);
   const [pendingPenalty, setPendingPenalty] = useState<Penalty>('NONE');
   const [pendingTime, setPendingTime] = useState<number>(0);
-  const awaitingSubmit = useRef(false);
+  const [awaitingSubmit, setAwaitingSubmit] = useState(false);
+  const [typingInput, setTypingInput] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
 
   const timerActive = room?.status === 'ACTIVE' && !submitted;
 
@@ -98,19 +209,19 @@ export default function BattleRoom() {
     (timeMs: number, _penalty: Penalty) => {
       setPendingTime(timeMs);
       setPendingPenalty('NONE');
-      awaitingSubmit.current = true;
+      setAwaitingSubmit(true);
     },
     [],
   );
 
   const engine = useTimerEngine({
-    inspection: false,
-    inspectionDirection: 'down',
-    inspectionVoice: false,
+    inspection: settings.inspection,
+    inspectionDirection: settings.inspectionDirection,
+    inspectionVoice: settings.inspectionVoice,
     holdToStart: settings.holdToStart,
     holdDuration: settings.holdDuration,
     startSound: settings.startSound,
-    enabled: timerActive && !awaitingSubmit.current,
+    enabled: timerActive && !awaitingSubmit && settings.entryMode === 'keyboard',
     onComplete: onTimerComplete,
   });
 
@@ -118,8 +229,17 @@ export default function BattleRoom() {
     if (!code || !room) return;
     solveComplete(code.toUpperCase(), pendingTime, penalty);
     setSubmitted(true);
-    awaitingSubmit.current = false;
+    setAwaitingSubmit(false);
     engine.cancel();
+  }
+
+  function handleTypingSubmit() {
+    const parsed = parseTimeInput(typingInput);
+    if (!parsed) { toast.error('Invalid time format'); return; }
+    setPendingTime(parsed);
+    setPendingPenalty('NONE');
+    setAwaitingSubmit(true);
+    setTypingInput('');
   }
 
   // Join the room on mount
@@ -144,7 +264,8 @@ export default function BattleRoom() {
   useEffect(() => {
     if (room?.status === 'ACTIVE') {
       setSubmitted(false);
-      awaitingSubmit.current = false;
+      setAwaitingSubmit(false);
+      setTypingInput('');
       engine.cancel();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,17 +317,26 @@ export default function BattleRoom() {
   }
 
   // ── Timer display ─────────────────────────────────────────────────────────
+  const isInspectionPhase = engine.phase === 'inspecting';
+
   function timerColor() {
     if (engine.phase === 'holding') return 'text-red-400';
     if (engine.phase === 'ready') return 'text-green-400';
+    if (engine.phase === 'inspecting') return 'text-yellow-400';
     if (engine.phase === 'running') return 'text-white';
     if (submitted) return 'text-green-400';
     return 'text-gray-300';
   }
 
   function timerDisplay() {
-    if (awaitingSubmit.current || engine.phase === 'stopped') {
+    if (awaitingSubmit || engine.phase === 'stopped') {
       return formatTime(pendingTime, 'NONE', settings.solvePrecision);
+    }
+    if (isInspectionPhase) {
+      if (settings.inspectionDirection === 'up') {
+        return formatTime(engine.elapsed, 'NONE', 1);
+      }
+      return String(Math.max(0, Math.ceil((15000 - engine.elapsed) / 1000)));
     }
     if (engine.phase === 'running') {
       const ms = engine.elapsed;
@@ -271,6 +401,13 @@ export default function BattleRoom() {
           </div>
           {!connected && <span className="text-xs text-red-400">Disconnected</span>}
           <button
+            className="text-muted hover:text-gray-200 transition-colors p-1"
+            title="Settings"
+            onClick={() => setShowSettings(true)}
+          >
+            <Icon name="gear" size={18} />
+          </button>
+          <button
             className="text-muted hover:text-red-400 transition-colors p-1"
             title="Leave room"
             onClick={handleLeave}
@@ -293,13 +430,13 @@ export default function BattleRoom() {
         <div
           className="card p-6 flex flex-col items-center gap-4 select-none cursor-default flex-1"
           onPointerDown={(e) => {
-            if (timerActive && !awaitingSubmit.current) {
+            if (timerActive && !awaitingSubmit && settings.entryMode === 'keyboard') {
               e.preventDefault();
               engine.press();
             }
           }}
           onPointerUp={(e) => {
-            if (timerActive && !awaitingSubmit.current) {
+            if (timerActive && !awaitingSubmit && settings.entryMode === 'keyboard') {
               e.preventDefault();
               engine.release();
             }
@@ -340,7 +477,7 @@ export default function BattleRoom() {
               </div>
               <div className="text-sm text-muted">Waiting for others…</div>
             </div>
-          ) : awaitingSubmit.current ? (
+          ) : awaitingSubmit ? (
             /* Stopped — choose penalty */
             <div className="flex flex-col items-center gap-4">
               <div className={clsx('text-5xl md:text-7xl font-mono font-bold transition-colors', timerColor())}>
@@ -367,14 +504,45 @@ export default function BattleRoom() {
                 </button>
               </div>
             </div>
+          ) : settings.entryMode === 'typing' ? (
+            /* Typing mode */
+            <div className="flex flex-col items-center gap-4 w-full">
+              <div className="text-xs text-muted">Enter your time (e.g. 12.58 or 1:02.34)</div>
+              <input
+                autoFocus
+                className="input text-center text-2xl font-mono w-56"
+                placeholder="0.00"
+                value={typingInput}
+                onChange={(e) => setTypingInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleTypingSubmit()}
+              />
+              <div className="flex gap-2">
+                <button
+                  className="px-4 py-2 rounded-lg text-sm font-semibold border border-border hover:bg-card-hover transition-colors text-red-400"
+                  onClick={() => { setPendingTime(0); setPendingPenalty('DNF'); setAwaitingSubmit(true); setTypingInput(''); }}
+                >
+                  DNF
+                </button>
+                <button className="btn-primary px-8" onClick={handleTypingSubmit}>
+                  Submit
+                </button>
+              </div>
+            </div>
           ) : (
-            /* Running or idle */
+            /* Running, inspection, or idle */
             <div className="flex flex-col items-center gap-2">
               <div className={clsx('text-5xl md:text-7xl font-mono font-bold transition-colors', timerColor())}>
                 {timerDisplay()}
               </div>
               {engine.phase === 'idle' && (
-                <div className="text-xs text-muted">Hold SPACE or tap to start</div>
+                <div className="text-xs text-muted">
+                  {settings.inspection ? 'Hold SPACE or tap to start inspection' : 'Hold SPACE or tap to start'}
+                </div>
+              )}
+              {isInspectionPhase && (
+                <div className="text-xs text-muted">
+                  {settings.holdToStart ? 'Hold SPACE to start timer' : 'Press SPACE to start timer'}
+                </div>
               )}
             </div>
           )}
@@ -481,6 +649,8 @@ export default function BattleRoom() {
       {lastResult && (
         <RoundResultOverlay result={lastResult} onDismiss={() => setLastResult(null)} />
       )}
+
+      <BattleSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 }
