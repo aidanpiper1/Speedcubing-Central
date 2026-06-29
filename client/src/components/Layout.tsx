@@ -10,7 +10,6 @@ interface NavItem {
   label: string;
   icon: IconName;
   auth?: boolean;
-  admin?: boolean;
 }
 
 const NAV: NavItem[] = [
@@ -19,7 +18,6 @@ const NAV: NavItem[] = [
   { to: '/calculator', label: 'Calculator', icon: 'calculator' },
   { to: '/alg-trainer', label: 'Alg Trainer', icon: 'cube' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
-  { to: '/admin', label: 'Admin', icon: 'sparkle', admin: true },
 ];
 
 // Items shown in the mobile bottom bar.
@@ -31,11 +29,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const isTimer = location.pathname === '/timer';
 
-  const visible = NAV.filter((n) => {
-    if (n.admin) return user?.role === 'ADMIN';
-    if (n.auth) return !!user;
-    return true;
-  });
+  const visible = NAV.filter((n) => (n.auth ? !!user : true));
 
   // Focus mode hides app chrome (sidebar + mobile bars) via CSS rather than by
   // restructuring the tree — restructuring would remount the page and reset state.

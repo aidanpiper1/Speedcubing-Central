@@ -4,7 +4,7 @@ import { env, isProd } from '../env.js';
 
 export interface JwtPayload {
   sub: string; // user id
-  role: 'GUEST' | 'USER' | 'ADMIN';
+  role: 'GUEST' | 'USER';
 }
 
 const ACCESS_TTL = '15m';

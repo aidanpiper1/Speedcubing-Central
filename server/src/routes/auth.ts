@@ -39,7 +39,7 @@ router.post('/register', async (req, res, next) => {
     const user = await prisma.user.create({
       data: { email, passwordHash, displayName, role: 'USER' },
     });
-    const payload: JwtPayload = { sub: user.id, role: user.role };
+    const payload: JwtPayload = { sub: user.id, role: user.role as JwtPayload['role'] };
     setAuthCookies(res, payload);
     res.status(201).json({ user: toPublicUser(user) });
   } catch (e) {
@@ -61,7 +61,7 @@ router.post('/login', async (req, res, next) => {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
-    const payload: JwtPayload = { sub: user.id, role: user.role };
+    const payload: JwtPayload = { sub: user.id, role: user.role as JwtPayload['role'] };
     setAuthCookies(res, payload);
     res.json({ user: toPublicUser(user) });
   } catch (e) {
@@ -90,7 +90,7 @@ router.post('/refresh', async (req, res) => {
       res.status(401).json({ error: 'User no longer exists' });
       return;
     }
-    const fresh: JwtPayload = { sub: user.id, role: user.role };
+    const fresh: JwtPayload = { sub: user.id, role: user.role as JwtPayload['role'] };
     setAuthCookies(res, fresh);
     res.json({ user: toPublicUser(user) });
   } catch {
@@ -220,7 +220,7 @@ router.get('/wca/callback', async (req, res) => {
       });
     }
 
-    const payload: JwtPayload = { sub: user.id, role: user.role };
+    const payload: JwtPayload = { sub: user.id, role: user.role as JwtPayload['role'] };
     setAuthCookies(res, payload);
     res.redirect(`${env.FRONTEND_URL}/profile`);
   } catch (e) {

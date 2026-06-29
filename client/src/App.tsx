@@ -12,14 +12,12 @@ import CalculatorPage from './features/calculator/CalculatorPage';
 import AlgTrainerPage from './features/alg-trainer/AlgTrainerPage';
 import LoginPage from './features/auth/LoginPage';
 import SettingsPage from './features/settings/SettingsPage';
-import AdminPage from './features/admin/AdminPage';
 
-function ProtectedRoute({ children, admin }: { children: JSX.Element; admin?: boolean }) {
+function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="p-8 text-muted">Loading…</div>;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (admin && user.role !== 'ADMIN') return <Navigate to="/" replace />;
   return children;
 }
 
@@ -50,14 +48,6 @@ export default function App() {
         <Route path="/alg-trainer" element={<AlgTrainerPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute admin>
-              <AdminPage />
-            </ProtectedRoute>
-          }
-        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <ToastContainer />

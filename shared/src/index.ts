@@ -2,7 +2,7 @@
 
 export * from './averaging.js';
 
-export type Role = 'GUEST' | 'USER' | 'ADMIN';
+export type Role = 'GUEST' | 'USER';
 export type Penalty = 'NONE' | 'PLUS2' | 'DNF';
 export type BattleStatus = 'WAITING' | 'ACTIVE' | 'FINISHED';
 

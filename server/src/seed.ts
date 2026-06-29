@@ -6,16 +6,6 @@ import { EVENT_IDS } from '@scc/shared';
 async function main() {
   console.log('Seeding database...');
 
-  // Admin user
-  const adminEmail = 'admin@speedcubing.central';
-  const passwordHash = await bcrypt.hash('admin1234', 10);
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: 'ADMIN' },
-    create: { email: adminEmail, passwordHash, displayName: 'Admin', role: 'ADMIN' },
-  });
-  console.log(`  Admin user: ${adminEmail} / admin1234`);
-
   // Demo user with a session and some solves
   const demoHash = await bcrypt.hash('demo1234', 10);
   const demo = await prisma.user.upsert({
@@ -50,7 +40,6 @@ async function main() {
   }
   console.log(`  Daily scrambles seeded for ${today}.`);
   void EVENT_IDS;
-  void admin;
 
   console.log('Seed complete.');
 }

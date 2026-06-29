@@ -17,7 +17,6 @@ import solvesRouter from './routes/solves.js';
 import dailyRouter from './routes/daily.js';
 import wcaRouter from './routes/wca.js';
 import profileRouter from './routes/profile.js';
-import adminRouter from './routes/admin.js';
 import battleRouter from './routes/battle.js';
 import bldRouter from './routes/bld.js';
 import algRouter from './routes/alg.js';
@@ -53,7 +52,6 @@ export function createApp() {
   app.use('/api/daily', dailyRouter);
   app.use('/api/wca', wcaRouter);
   app.use('/api/profile', profileRouter);
-  app.use('/api/admin', adminRouter);
   app.use('/api/battle', battleRouter);
   app.use('/api/bld', bldRouter);
   app.use('/api/alg', algRouter);
