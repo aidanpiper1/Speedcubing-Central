@@ -18,15 +18,28 @@ export function generateScramble(eventId: string): string {
   }
 }
 
-// WCA-quality random-state scramble via cubing.js (same generator family as
-// TNoodle). Async; imported lazily so server startup isn't blocked by the WASM.
+// Events where cubing.js is essential: BLD scrambles need the Rw/Uw orientation
+// moves that TNoodle appends and scrambow omits.
+const CUBING_JS_EVENTS = new Set(['333bf', '444bf', '555bf']);
+
+// WCA-quality random-state scramble via cubing.js for BLD events; synchronous
+// scrambow for everything else (avoids Node.js worker_thread instability in
+// some hosting environments).
 export async function getScramble(eventId: string): Promise<string> {
-  try {
-    const { randomScrambleForEvent } = await import('cubing/scramble');
-    const alg = await randomScrambleForEvent(eventId);
-    return normalizeScramble(alg.toString());
-  } catch (e) {
-    console.warn('[scramble] random-state failed, falling back:', e instanceof Error ? e.message : e);
-    return generateScramble(eventId);
+  if (CUBING_JS_EVENTS.has(eventId)) {
+    try {
+      const timeoutMs = 15_000;
+      const { randomScrambleForEvent } = await import('cubing/scramble');
+      const alg = await Promise.race([
+        randomScrambleForEvent(eventId),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('cubing.js timeout')), timeoutMs),
+        ),
+      ]);
+      return normalizeScramble(alg.toString());
+    } catch (e) {
+      console.warn('[scramble] cubing.js failed, falling back:', e instanceof Error ? e.message : e);
+    }
   }
+  return generateScramble(eventId);
 }
