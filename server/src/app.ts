@@ -65,17 +65,10 @@ export function createApp() {
 
   // Serve the built React app for all non-API routes.
   const clientDist = path.resolve(__dirname, '../../client/dist');
-  console.log('[static] __dirname:', __dirname);
-  console.log('[static] clientDist:', clientDist);
-  console.log('[static] exists:', fs.existsSync(clientDist));
   if (fs.existsSync(clientDist)) {
     app.use(express.static(clientDist));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(clientDist, 'index.html'));
-    });
-  } else {
-    app.get('*', (_req, res) => {
-      res.status(503).send(`client/dist not found at ${clientDist}`);
     });
   }
 
