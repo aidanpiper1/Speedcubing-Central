@@ -20,6 +20,7 @@ import profileRouter from './routes/profile.js';
 import battleRouter from './routes/battle.js';
 import bldRouter from './routes/bld.js';
 import algRouter from './routes/alg.js';
+import scrambleRouter from './routes/scramble.js';
 
 export function createApp() {
   const app = express();
@@ -28,7 +29,18 @@ export function createApp() {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'self'"],
+      },
+    },
     }),
   );
   app.use(
@@ -60,6 +72,7 @@ export function createApp() {
   app.use('/api/battle', battleRouter);
   app.use('/api/bld', bldRouter);
   app.use('/api/alg', algRouter);
+  app.use('/api/scramble', scrambleRouter);
 
   // 404 for unknown API routes
   app.use('/api', (_req, res) => {

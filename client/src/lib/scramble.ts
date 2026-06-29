@@ -1,8 +1,8 @@
-import { randomScrambleForEvent } from 'cubing/scramble';
 import { Scrambow } from 'scrambow';
 import { getEvent, normalizeScramble } from '@scc/shared';
+import { api } from './api';
 
-// Move sets for unofficial events that cubing.js and scrambow don't support.
+// Move sets for unofficial events as an emergency client-side fallback.
 const UNOFFICIAL_MOVES: Record<string, string[]> = {
   kilominx: ["U", "U'", "R", "R'", "D", "D'", "L", "L'", "F", "F'", "BR", "BR'", "BL", "BL'"],
   fto: ["U", "U'", "F", "F'", "R", "R'", "L", "L'", "BL", "BL'", "BR", "BR'", "D", "D'"],
@@ -15,7 +15,7 @@ function randomMoveScramble(moves: string[], length: number): string {
   return out.join(' ');
 }
 
-// Fast synchronous fallback (random-move) used if random-state generation fails.
+// Synchronous client-side fallback — used only if the server API is unreachable.
 export function generateScramble(eventId: string): string {
   const unofficial = UNOFFICIAL_MOVES[eventId];
   if (unofficial) return randomMoveScramble(unofficial, 20);
@@ -29,16 +29,14 @@ export function generateScramble(eventId: string): string {
   }
 }
 
-// WCA-quality random-state scramble via cubing.js (the same generator family as
-// TNoodle). Async — random-state for 4x4+ can take up to a couple of seconds.
-// Unofficial events skip cubing.js and go straight to the random-move generator.
+// Fetch a WCA-quality random-state scramble from the server (cubing.js runs
+// server-side via Node.js worker_threads, avoiding browser Web Worker issues).
 export async function getScramble(eventId: string): Promise<string> {
-  if (UNOFFICIAL_MOVES[eventId]) return generateScramble(eventId);
   try {
-    const alg = await randomScrambleForEvent(eventId);
-    return normalizeScramble(alg.toString());
+    const { data } = await api.get<{ scramble: string }>(`/scramble/${eventId}`);
+    if (data.scramble) return data.scramble;
   } catch (e) {
-    console.warn('random-state scramble failed, falling back:', e);
-    return generateScramble(eventId);
+    console.warn('Server scramble failed, falling back:', e);
   }
+  return generateScramble(eventId);
 }
