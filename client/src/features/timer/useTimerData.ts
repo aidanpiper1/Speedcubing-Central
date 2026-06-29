@@ -105,17 +105,18 @@ export function useTimerData(eventId: string) {
   );
 
   const addSolve = useCallback(
-    async (time: number, penalty: Penalty, scramble: string) => {
-      if (!currentId) return;
+    async (time: number, penalty: Penalty, scramble: string, sessionId?: string) => {
+      const id = sessionId ?? currentId;
+      if (!id) return;
       let solve: SolveDTO;
       if (isGuest) {
-        solve = guestStore.addSolve(currentId, time, penalty, scramble);
+        solve = guestStore.addSolve(id, time, penalty, scramble);
       } else {
-        solve = (await api.post<SolveDTO>(`/sessions/${currentId}/solves`, { time, penalty, scramble })).data;
+        solve = (await api.post<SolveDTO>(`/sessions/${id}/solves`, { time, penalty, scramble })).data;
       }
       setSolves((prev) => [solve, ...prev]);
       setSessions((prev) =>
-        prev.map((s) => (s.id === currentId ? { ...s, solveCount: (s.solveCount ?? 0) + 1 } : s)),
+        prev.map((s) => (s.id === id ? { ...s, solveCount: (s.solveCount ?? 0) + 1 } : s)),
       );
     },
     [currentId, isGuest],

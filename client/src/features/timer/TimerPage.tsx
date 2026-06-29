@@ -93,8 +93,12 @@ export default function TimerPage() {
 
   const onComplete = useCallback(
     async (timeMs: number, penalty: Penalty) => {
-      if (!data.currentId) await data.createSession(`${getEvent(event)?.name ?? event} Session`);
-      await data.addSolve(timeMs, penalty, scr.scramble);
+      let sessionId = data.currentId;
+      if (!sessionId) {
+        const created = await data.createSession(`${getEvent(event)?.name ?? event} Session`);
+        sessionId = created.id;
+      }
+      await data.addSolve(timeMs, penalty, scr.scramble, sessionId);
       scr.advance();
     },
     [data, scr, event],
