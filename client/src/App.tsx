@@ -10,6 +10,8 @@ import Dashboard from './features/landing/Dashboard';
 import TimerPage from './features/timer/TimerPage';
 import CalculatorPage from './features/calculator/CalculatorPage';
 import AlgTrainerPage from './features/alg-trainer/AlgTrainerPage';
+import BattleLobby from './features/battle/BattleLobby';
+import BattleRoom from './features/battle/BattleRoom';
 import LoginPage from './features/auth/LoginPage';
 import SettingsPage from './features/settings/SettingsPage';
 
@@ -46,6 +48,8 @@ export default function App() {
         <Route path="/timer" element={<TimerPage />} />
         <Route path="/calculator" element={<CalculatorPage />} />
         <Route path="/alg-trainer" element={<AlgTrainerPage />} />
+        <Route path="/battle" element={<BattleLobby />} />
+        <Route path="/battle/:code" element={<BattleRoom />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -17,17 +17,19 @@ const NAV: NavItem[] = [
   { to: '/timer', label: 'Timer', icon: 'timer' },
   { to: '/calculator', label: 'Calculator', icon: 'calculator' },
   { to: '/alg-trainer', label: 'Alg Trainer', icon: 'cube' },
+  { to: '/battle', label: 'Battle', icon: 'swords' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
 // Items shown in the mobile bottom bar.
-const MOBILE_NAV = ['/', '/timer', '/calculator', '/alg-trainer', '/settings'];
+const MOBILE_NAV = ['/', '/timer', '/battle', '/alg-trainer', '/settings'];
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { focusMode, setFocusMode } = useUi();
   const location = useLocation();
   const isTimer = location.pathname === '/timer';
+  const isBattle = location.pathname.startsWith('/battle/');
 
   const visible = NAV.filter((n) => (n.auth ? !!user : true));
 
@@ -125,7 +127,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className={clsx('p-4', isTimer ? 'md:p-4' : 'max-w-6xl mx-auto md:p-8')}>{children}</div>
+        <div className={clsx('p-4', (isTimer || isBattle) ? 'md:p-4' : 'max-w-6xl mx-auto md:p-8')}>{children}</div>
       </main>
 
       {/* Mobile bottom tab bar */}

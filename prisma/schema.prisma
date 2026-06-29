@@ -101,12 +101,16 @@ model DailyResult {
 }
 
 model BattleRoom {
-  id        String       @id @default(cuid())
-  code      String       @unique
-  scramble  String
-  eventId   String
-  status    BattleStatus @default(WAITING)
-  createdAt DateTime     @default(now())
+  id          String       @id @default(cuid())
+  name        String       @default("")
+  code        String       @unique
+  eventId     String       @default("333")
+  isPublic    Boolean      @default(true)
+  password    String?
+  scramble    String       @default("")
+  roundNumber Int          @default(0)
+  status      BattleStatus @default(WAITING)
+  createdAt   DateTime     @default(now())
 
   participants BattleParticipant[]
 }
@@ -116,10 +120,11 @@ model BattleParticipant {
   roomId     String
   userId     String?
   guestName  String?
+  points     Int       @default(0)
+  ready      Boolean   @default(false)
   time       Int?
   penalty    Penalty?
   finishedAt DateTime?
-  ready      Boolean   @default(false)
 
   room BattleRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   user User?      @relation(fields: [userId], references: [id], onDelete: SetNull)

@@ -106,6 +106,7 @@ export interface BattleParticipantDTO {
   id: string;
   userId?: string | null;
   name: string;
+  points: number;
   ready: boolean;
   time?: number | null;
   penalty?: Penalty | null;
@@ -115,35 +116,48 @@ export interface BattleParticipantDTO {
 export interface BattleRoomDTO {
   id: string;
   code: string;
-  scramble: string;
+  name: string;
   eventId: string;
+  isPublic: boolean;
+  scramble: string;
+  roundNumber: number;
   status: BattleStatus;
   participants: BattleParticipantDTO[];
+}
+
+export interface BattlePublicRoomDTO {
+  code: string;
+  name: string;
+  eventId: string;
+  participantCount: number;
+  status: BattleStatus;
+}
+
+export interface BattleRoundResultEntry {
+  participantId: string;
+  name: string;
+  time: number | null;
+  penalty: Penalty | null;
+  rank: number;
+  pointsEarned: number;
+  totalPoints: number;
 }
 
 // ---- Socket.io event payloads ----
 
 export interface ServerToClientEvents {
   room_state: (room: BattleRoomDTO) => void;
-  both_ready: (payload: { scramble: string }) => void;
-  scramble: (payload: { scramble: string }) => void;
-  opponent_finished: (payload: { participantId: string; time: number; penalty: Penalty }) => void;
-  room_result: (payload: BattleResult) => void;
+  round_start: (payload: { scramble: string; roundNumber: number }) => void;
+  participant_finished: (payload: { participantId: string; name: string; time: number | null; penalty: Penalty | null }) => void;
+  round_result: (payload: { results: BattleRoundResultEntry[]; roundNumber: number }) => void;
   error_msg: (payload: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
-  join_room: (payload: { code: string; userId?: string; name: string }) => void;
-  ready: (payload: { code: string }) => void;
+  join_room: (payload: { code: string; userId?: string; name: string; password?: string }) => void;
+  toggle_ready: (payload: { code: string }) => void;
   solve_complete: (payload: { code: string; time: number; penalty: Penalty }) => void;
   leave_room: (payload: { code: string }) => void;
-  rematch: (payload: { code: string }) => void;
-}
-
-export interface BattleResult {
-  roomId: string;
-  winnerParticipantId: string | null; // null means draw
-  results: BattleParticipantDTO[];
 }
 
 // Effective solve time given a penalty. DNF returns Infinity.

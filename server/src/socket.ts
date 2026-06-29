@@ -1,5 +1,6 @@
 import { Server as IOServer } from 'socket.io';
 import type { Server as HttpServer } from 'node:http';
+import bcrypt from 'bcryptjs';
 import { prisma } from './prisma.js';
 import { env } from './env.js';
 import { getScramble } from './scramble.js';
@@ -8,7 +9,16 @@ import {
   type ClientToServerEvents,
   type ServerToClientEvents,
   type BattleRoomDTO,
+  type BattleRoundResultEntry,
 } from '@scc/shared';
+
+// Points awarded by finish rank (index 0 = 1st place).
+const POINTS_BY_RANK = [5, 3, 2];
+const POINTS_DEFAULT = 1; // 4th place and beyond
+
+function rankPoints(rank: number): number {
+  return POINTS_BY_RANK[rank - 1] ?? POINTS_DEFAULT;
+}
 
 async function buildRoomDTO(code: string): Promise<BattleRoomDTO | null> {
   const room = await prisma.battleRoom.findUnique({
@@ -19,13 +29,17 @@ async function buildRoomDTO(code: string): Promise<BattleRoomDTO | null> {
   return {
     id: room.id,
     code: room.code,
-    scramble: room.scramble,
+    name: room.name,
     eventId: room.eventId,
+    isPublic: room.isPublic,
+    scramble: room.scramble,
+    roundNumber: room.roundNumber,
     status: room.status,
     participants: room.participants.map((p) => ({
       id: p.id,
       userId: p.userId,
       name: p.guestName ?? 'Player',
+      points: p.points,
       ready: p.ready,
       time: p.time,
       penalty: p.penalty,
@@ -39,8 +53,62 @@ export function attachSocket(server: HttpServer): IOServer {
     cors: { origin: env.FRONTEND_URL, credentials: true },
   });
 
+  // Check round completion and emit results + reset if all in-round participants are done.
+  async function checkRoundCompletion(code: string): Promise<void> {
+    const room = await prisma.battleRoom.findUnique({
+      where: { code },
+      include: { participants: { orderBy: { id: 'asc' } } },
+    });
+    if (!room || room.status !== 'ACTIVE') return;
+
+    const inRound = room.participants.filter((p) => p.ready);
+    if (inRound.length < 2) return;
+    if (!inRound.every((p) => p.finishedAt !== null)) return;
+
+    // Rank by effective time (DNF → Infinity, sorts last).
+    const ranked = [...inRound].sort(
+      (a, b) =>
+        effectiveTime(a.time ?? Infinity, a.penalty ?? 'NONE') -
+        effectiveTime(b.time ?? Infinity, b.penalty ?? 'NONE'),
+    );
+
+    const results: BattleRoundResultEntry[] = [];
+    for (let i = 0; i < ranked.length; i++) {
+      const p = ranked[i];
+      const et = effectiveTime(p.time ?? Infinity, p.penalty ?? 'NONE');
+      const isDNF = !isFinite(et);
+      const pointsEarned = isDNF ? 0 : rankPoints(i + 1);
+
+      await prisma.battleParticipant.update({
+        where: { id: p.id },
+        data: { points: { increment: pointsEarned } },
+      });
+
+      results.push({
+        participantId: p.id,
+        name: p.guestName ?? 'Player',
+        time: p.time,
+        penalty: p.penalty,
+        rank: i + 1,
+        pointsEarned,
+        totalPoints: p.points + pointsEarned,
+      });
+    }
+
+    // Reset all participants for the next round.
+    await prisma.battleParticipant.updateMany({
+      where: { roomId: room.id },
+      data: { ready: false, time: null, penalty: null, finishedAt: null },
+    });
+    await prisma.battleRoom.update({
+      where: { id: room.id },
+      data: { status: 'WAITING' },
+    });
+
+    io.to(code).emit('round_result', { results, roundNumber: room.roundNumber });
+  }
+
   io.on('connection', (socket) => {
-    // Track which participant row this socket owns, per room.
     let myParticipantId: string | null = null;
     let myCode: string | null = null;
 
@@ -49,7 +117,6 @@ export function attachSocket(server: HttpServer): IOServer {
       if (dto) io.to(code).emit('room_state', dto);
     }
 
-    // Wrap async socket handlers so a DB error can never crash the server.
     const safe =
       <A extends unknown[]>(fn: (...args: A) => Promise<void>) =>
       (...args: A) => {
@@ -59,142 +126,192 @@ export function attachSocket(server: HttpServer): IOServer {
         });
       };
 
-    socket.on('join_room', safe(async ({ code, userId, name }) => {
-      code = code.toUpperCase();
-      const room = await prisma.battleRoom.findUnique({
-        where: { code },
-        include: { participants: true },
-      });
-      if (!room) {
-        socket.emit('error_msg', { message: 'Room not found' });
-        return;
-      }
-      // Only treat userId as a real FK if that user actually exists; otherwise
-      // join as a guest (prevents foreign-key violations from stale ids).
-      let safeUserId: string | null = null;
-      if (userId) {
-        const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-        safeUserId = exists ? userId : null;
-      }
-      if (room.participants.length >= 2 && !room.participants.some((p) => p.userId === safeUserId && safeUserId)) {
-        socket.emit('error_msg', { message: 'Room is full' });
-        return;
-      }
-      // Reuse an existing participant row for this user, else create one.
-      let participant = safeUserId ? room.participants.find((p) => p.userId === safeUserId) : undefined;
-      if (!participant) {
-        participant = await prisma.battleParticipant.create({
-          data: { roomId: room.id, userId: safeUserId, guestName: name },
+    socket.on(
+      'join_room',
+      safe(async ({ code, userId, name, password }) => {
+        code = code.toUpperCase();
+        const room = await prisma.battleRoom.findUnique({
+          where: { code },
+          include: { participants: true },
         });
-      }
-      myParticipantId = participant.id;
-      myCode = code;
-      socket.join(code);
-      socket.emit('scramble', { scramble: room.scramble });
-      await emitRoomState(code);
-    }));
+        if (!room) {
+          socket.emit('error_msg', { message: 'Room not found' });
+          return;
+        }
 
-    socket.on('ready', safe(async ({ code }) => {
-      code = code.toUpperCase();
-      if (!myParticipantId) return;
-      await prisma.battleParticipant.update({
-        where: { id: myParticipantId },
-        data: { ready: true },
-      });
-      const room = await prisma.battleRoom.findUnique({
-        where: { code },
-        include: { participants: true },
-      });
-      if (!room) return;
-      const allReady = room.participants.length >= 2 && room.participants.every((p) => p.ready);
-      if (allReady) {
-        await prisma.battleRoom.update({ where: { id: room.id }, data: { status: 'ACTIVE' } });
-        io.to(code).emit('both_ready', { scramble: room.scramble });
-      }
-      await emitRoomState(code);
-    }));
+        // Password check for private rooms.
+        if (room.password) {
+          if (!password) {
+            socket.emit('error_msg', { message: 'This room requires a password' });
+            return;
+          }
+          const valid = await bcrypt.compare(password, room.password);
+          if (!valid) {
+            socket.emit('error_msg', { message: 'Incorrect password' });
+            return;
+          }
+        }
 
-    socket.on('solve_complete', safe(async ({ code, time, penalty }) => {
-      code = code.toUpperCase();
-      if (!myParticipantId) return;
-      await prisma.battleParticipant.update({
-        where: { id: myParticipantId },
-        data: { time, penalty, finishedAt: new Date() },
-      });
-      socket.to(code).emit('opponent_finished', { participantId: myParticipantId, time, penalty });
+        // Validate userId against DB to prevent FK violations from stale IDs.
+        let safeUserId: string | null = null;
+        if (userId) {
+          const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+          safeUserId = exists ? userId : null;
+        }
 
-      const room = await prisma.battleRoom.findUnique({
-        where: { code },
-        include: { participants: true },
-      });
-      if (!room) return;
-      const finished = room.participants.filter((p) => p.finishedAt !== null);
-      if (room.participants.length >= 2 && finished.length >= 2) {
-        // Determine winner.
-        const ranked = [...room.participants].sort(
-          (a, b) =>
-            effectiveTime(a.time ?? Infinity, a.penalty ?? 'NONE') -
-            effectiveTime(b.time ?? Infinity, b.penalty ?? 'NONE'),
-        );
-        const t0 = effectiveTime(ranked[0].time ?? Infinity, ranked[0].penalty ?? 'NONE');
-        const t1 = effectiveTime(ranked[1].time ?? Infinity, ranked[1].penalty ?? 'NONE');
-        const winnerId = t0 === t1 ? null : ranked[0].id;
-        await prisma.battleRoom.update({ where: { id: room.id }, data: { status: 'FINISHED' } });
-        io.to(code).emit('room_result', {
-          roomId: room.id,
-          winnerParticipantId: winnerId,
-          results: room.participants.map((p) => ({
-            id: p.id,
-            userId: p.userId,
-            name: p.guestName ?? 'Player',
-            ready: p.ready,
-            time: p.time,
-            penalty: p.penalty,
-            finishedAt: p.finishedAt?.toISOString() ?? null,
-          })),
+        // Reuse existing slot if same authenticated user is rejoining.
+        const existing = safeUserId ? room.participants.find((p) => p.userId === safeUserId) : undefined;
+        if (!existing && room.participants.length >= 10) {
+          socket.emit('error_msg', { message: 'Room is full (max 10 players)' });
+          return;
+        }
+
+        let participant = existing;
+        if (!participant) {
+          participant = await prisma.battleParticipant.create({
+            data: { roomId: room.id, userId: safeUserId, guestName: name },
+          });
+        }
+        myParticipantId = participant.id;
+        myCode = code;
+        socket.join(code);
+        await emitRoomState(code);
+      }),
+    );
+
+    socket.on(
+      'toggle_ready',
+      safe(async ({ code }) => {
+        code = code.toUpperCase();
+        if (!myParticipantId) return;
+        const room = await prisma.battleRoom.findUnique({
+          where: { code },
+          include: { participants: true },
         });
-      }
-      await emitRoomState(code);
-    }));
+        if (!room || room.status !== 'WAITING') return;
 
-    socket.on('rematch', safe(async ({ code }) => {
-      code = code.toUpperCase();
-      const room = await prisma.battleRoom.findUnique({ where: { code } });
-      if (!room) return;
-      await prisma.battleParticipant.updateMany({
-        where: { roomId: room.id },
-        data: { ready: false, time: null, penalty: null, finishedAt: null },
-      });
-      await prisma.battleRoom.update({
-        where: { id: room.id },
-        data: { status: 'WAITING', scramble: await getScramble(room.eventId) },
-      });
-      const updated = await prisma.battleRoom.findUnique({ where: { id: room.id } });
-      if (updated) io.to(code).emit('scramble', { scramble: updated.scramble });
-      await emitRoomState(code);
-    }));
+        const me = room.participants.find((p) => p.id === myParticipantId);
+        if (!me) return;
 
-    socket.on('leave_room', safe(async ({ code }) => {
-      code = code.toUpperCase();
-      if (myParticipantId) {
+        await prisma.battleParticipant.update({
+          where: { id: myParticipantId },
+          data: { ready: !me.ready },
+        });
+
+        // Re-fetch to check if everyone is ready.
+        const updated = await prisma.battleRoom.findUnique({
+          where: { code },
+          include: { participants: true },
+        });
+        if (!updated) return;
+
+        const allReady =
+          updated.participants.length >= 2 && updated.participants.every((p) => p.ready);
+        if (allReady) {
+          const scramble = await getScramble(room.eventId);
+          const roundNumber = room.roundNumber + 1;
+          await prisma.battleRoom.update({
+            where: { id: room.id },
+            data: { status: 'ACTIVE', scramble, roundNumber },
+          });
+          io.to(code).emit('round_start', { scramble, roundNumber });
+        }
+
+        await emitRoomState(code);
+      }),
+    );
+
+    socket.on(
+      'solve_complete',
+      safe(async ({ code, time, penalty }) => {
+        code = code.toUpperCase();
+        if (!myParticipantId) return;
+        const room = await prisma.battleRoom.findUnique({
+          where: { code },
+          include: { participants: true },
+        });
+        if (!room || room.status !== 'ACTIVE') return;
+
+        const me = room.participants.find((p) => p.id === myParticipantId);
+        if (!me || !me.ready || me.finishedAt) return; // not in this round or already submitted
+
+        await prisma.battleParticipant.update({
+          where: { id: myParticipantId },
+          data: { time, penalty, finishedAt: new Date() },
+        });
+
+        socket.to(code).emit('participant_finished', {
+          participantId: myParticipantId,
+          name: me.guestName ?? 'Player',
+          time,
+          penalty,
+        });
+
+        await checkRoundCompletion(code);
+        await emitRoomState(code);
+      }),
+    );
+
+    socket.on(
+      'leave_room',
+      safe(async ({ code }) => {
+        code = code.toUpperCase();
+        if (!myParticipantId) return;
+
+        const room = await prisma.battleRoom.findUnique({
+          where: { code },
+          include: { participants: true },
+        });
+
+        // If round is active and this participant hasn't finished, mark as DNF.
+        if (room?.status === 'ACTIVE') {
+          const me = room.participants.find((p) => p.id === myParticipantId);
+          if (me && !me.finishedAt) {
+            await prisma.battleParticipant.update({
+              where: { id: myParticipantId },
+              data: { finishedAt: new Date(), penalty: 'DNF', time: null },
+            });
+          }
+        }
+
         await prisma.battleParticipant.deleteMany({ where: { id: myParticipantId } });
+        socket.leave(code);
         myParticipantId = null;
-      }
-      socket.leave(code);
-      await emitRoomState(code);
-    }));
+
+        if (room?.status === 'ACTIVE') {
+          await checkRoundCompletion(code);
+        }
+        await emitRoomState(code);
+        myCode = null;
+      }),
+    );
 
     socket.on('disconnect', async () => {
-      if (myParticipantId && myCode) {
-        try {
+      if (!myParticipantId || !myCode) return;
+      try {
+        const room = await prisma.battleRoom.findUnique({
+          where: { code: myCode },
+          include: { participants: true },
+        });
+        if (room?.status === 'ACTIVE') {
+          const me = room.participants.find((p) => p.id === myParticipantId);
+          if (me && !me.finishedAt) {
+            await prisma.battleParticipant.update({
+              where: { id: myParticipantId },
+              data: { finishedAt: new Date(), penalty: 'DNF', time: null },
+            });
+            await checkRoundCompletion(myCode);
+          }
+        } else {
+          // In waiting: just unready them so they don't block the next round start.
           await prisma.battleParticipant.update({
             where: { id: myParticipantId },
             data: { ready: false },
           });
-          await emitRoomState(myCode);
-        } catch {
-          /* room may be gone */
         }
+        await emitRoomState(myCode);
+      } catch {
+        /* room may be gone */
       }
     });
   });

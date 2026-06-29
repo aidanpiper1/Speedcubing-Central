@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma.js';
 import { optionalAuth } from '../auth/middleware.js';
 import { getScramble } from '../scramble.js';
@@ -10,29 +11,60 @@ const router = Router();
 function makeCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';
-  for (let i = 0; i < 5; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
 
 const createSchema = z.object({
+  name: z.string().min(1).max(40),
   eventId: z.string().refine((id) => EVENT_IDS.includes(id), 'Invalid event').default('333'),
+  isPublic: z.boolean().default(true),
+  password: z.string().min(1).max(64).optional(),
 });
 
 // POST /api/battle — create a room
 router.post('/', optionalAuth, async (req, res, next) => {
   try {
-    const { eventId } = createSchema.parse(req.body ?? {});
+    const { name, eventId, isPublic, password } = createSchema.parse(req.body ?? {});
+    if (!isPublic && !password) {
+      res.status(400).json({ error: 'Private rooms require a password' });
+      return;
+    }
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
     let code = makeCode();
-    // ensure uniqueness
     for (let i = 0; i < 5; i++) {
       const exists = await prisma.battleRoom.findUnique({ where: { code } });
       if (!exists) break;
       code = makeCode();
     }
+    const scramble = await getScramble(eventId);
     const room = await prisma.battleRoom.create({
-      data: { code, eventId, scramble: await getScramble(eventId), status: 'WAITING' },
+      data: { name, code, eventId, isPublic, password: hashedPassword, scramble },
     });
-    res.status(201).json({ code: room.code, id: room.id, eventId: room.eventId });
+    res.status(201).json({ code: room.code, id: room.id });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET /api/battle/public — list public rooms
+router.get('/public', async (_req, res, next) => {
+  try {
+    const rooms = await prisma.battleRoom.findMany({
+      where: { isPublic: true },
+      include: { _count: { select: { participants: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    res.json(
+      rooms.map((r) => ({
+        code: r.code,
+        name: r.name,
+        eventId: r.eventId,
+        participantCount: r._count.participants,
+        status: r.status,
+      })),
+    );
   } catch (e) {
     next(e);
   }
@@ -52,13 +84,17 @@ router.get('/:code', async (req, res, next) => {
     res.json({
       id: room.id,
       code: room.code,
+      name: room.name,
       eventId: room.eventId,
+      isPublic: room.isPublic,
       scramble: room.scramble,
+      roundNumber: room.roundNumber,
       status: room.status,
       participants: room.participants.map((p) => ({
         id: p.id,
         userId: p.userId,
         name: p.guestName ?? 'Player',
+        points: p.points,
         ready: p.ready,
         time: p.time,
         penalty: p.penalty,
