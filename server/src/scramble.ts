@@ -18,9 +18,9 @@ export function generateScramble(eventId: string): string {
   }
 }
 
-// Events where cubing.js is essential: BLD scrambles need the Rw/Uw orientation
-// moves that TNoodle appends and scrambow omits.
-const CUBING_JS_EVENTS = new Set(['333bf', '444bf', '555bf']);
+// Events that need cubing.js: BLD (needs orientation moves scrambow omits),
+// and unofficial events (fto, kilominx, redi_cube) that scrambow doesn't support at all.
+const CUBING_JS_EVENTS = new Set(['333bf', '444bf', '555bf', 'fto', 'kilominx', 'redi_cube']);
 
 // WCA-quality random-state scramble via cubing.js for BLD events; synchronous
 // scrambow for everything else (avoids Node.js worker_thread instability in
