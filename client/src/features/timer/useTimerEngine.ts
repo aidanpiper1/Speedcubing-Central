@@ -65,6 +65,7 @@ export function useTimerEngine(opts: Options) {
   const holdTimer = useRef<number | null>(null);
   const inspectionStart = useRef(0);
   const inspectionRaf = useRef(0);
+  const inspectionPenaltyRef = useRef<Penalty>('NONE');
   const spoken = useRef({ eight: false, twelve: false });
   const phaseRef = useRef<TimerPhase>('idle');
   phaseRef.current = phase;
@@ -95,12 +96,13 @@ export function useTimerEngine(opts: Options) {
     const finalMs = performance.now() - startRef.current;
     setElapsed(finalMs);
     setPhase('stopped');
-    onComplete(Math.round(finalMs), inspectionPenaltyAtStart());
+    onComplete(Math.round(finalMs), inspectionPenaltyRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onComplete]);
 
   const startRunning = useCallback(() => {
     stopInspectionRaf();
+    inspectionPenaltyRef.current = inspectionPenaltyAtStart();
     startRef.current = performance.now();
     setElapsed(0);
     setPhase('running');
