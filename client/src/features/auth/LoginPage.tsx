@@ -130,7 +130,6 @@ export default function LoginPage() {
           {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Log in'}
         </button>
 
-        <p className="text-xs text-muted mt-4 text-center">Demo: demo@speedcubing.central / demo1234</p>
       </div>
     </div>
   );
