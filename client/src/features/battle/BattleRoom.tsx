@@ -190,7 +190,6 @@ export default function BattleRoom() {
     myParticipantId: myParticipantIdRef,
     setMyParticipantId,
     joinRoom,
-    toggleReady,
     solveComplete,
     leaveRoom,
   } = useBattleSocket();
@@ -306,12 +305,8 @@ export default function BattleRoom() {
 
   function participantStatus(p: NonNullable<typeof room>['participants'][number]) {
     if (room?.status === 'WAITING') {
-      return p.ready
-        ? { label: 'Ready', color: 'green' as const }
-        : { label: 'Not ready', color: 'grey' as const };
+      return { label: 'Waiting', color: 'grey' as const };
     }
-    // ACTIVE
-    if (!p.ready) return { label: 'Spectating', color: 'grey' as const };
     if (p.finishedAt) return { label: formatTime(p.time, p.penalty ?? 'NONE'), color: 'green' as const };
     return { label: 'Solving…', color: 'yellow' as const };
   }

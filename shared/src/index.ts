@@ -107,7 +107,6 @@ export interface BattleParticipantDTO {
   userId?: string | null;
   name: string;
   points: number;
-  ready: boolean;
   time?: number | null;
   penalty?: Penalty | null;
   finishedAt?: string | null;
@@ -155,7 +154,6 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   join_room: (payload: { code: string; userId?: string; name: string; password?: string }) => void;
-  toggle_ready: (payload: { code: string }) => void;
   solve_complete: (payload: { code: string; time: number; penalty: Penalty }) => void;
   leave_room: (payload: { code: string }) => void;
 }

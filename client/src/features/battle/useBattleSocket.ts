@@ -97,10 +97,6 @@ export function useBattleSocket() {
     myParticipantIdRef.current = id;
   }, []);
 
-  const toggleReady = useCallback((code: string) => {
-    socketRef.current?.emit('toggle_ready', { code });
-  }, []);
-
   const solveComplete = useCallback((code: string, time: number, penalty: Penalty) => {
     socketRef.current?.emit('solve_complete', { code, time, penalty });
   }, []);
@@ -120,7 +116,6 @@ export function useBattleSocket() {
     myParticipantId: myParticipantIdRef,
     setMyParticipantId,
     joinRoom,
-    toggleReady,
     solveComplete,
     leaveRoom,
   };

@@ -121,7 +121,6 @@ model BattleParticipant {
   userId     String?
   guestName  String?
   points     Int       @default(0)
-  ready      Boolean   @default(false)
   time       Int?
   penalty    Penalty?
   finishedAt DateTime?
