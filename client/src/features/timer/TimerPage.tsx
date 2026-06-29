@@ -21,29 +21,6 @@ import { copyText, formatSolveCopy } from './copy';
 
 const SOLVE_GRID = 'grid grid-cols-[1.8rem_5rem_3.6rem_3.6rem_1fr] gap-2 items-center';
 
-const SQ1_COLOR: Record<string, string> = {
-  white:  'bg-white border border-gray-300',
-  yellow: 'bg-yellow-400 border border-yellow-500',
-  black:  'bg-gray-900 border border-gray-700 dark:bg-black dark:border-gray-600',
-};
-
-function Sq1Swatch({ scheme }: { scheme: string }) {
-  const [top, bottom] = scheme.split('/');
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted">
-      <span className="flex items-center gap-1">
-        <span className={`inline-block w-3 h-3 rounded-full shrink-0 ${SQ1_COLOR[top]}`} />
-        Top: <span className="capitalize text-gray-700 dark:text-gray-300">{top}</span>
-      </span>
-      <span className="text-border">/</span>
-      <span className="flex items-center gap-1">
-        <span className={`inline-block w-3 h-3 rounded-full shrink-0 ${SQ1_COLOR[bottom]}`} />
-        Bottom: <span className="capitalize text-gray-700 dark:text-gray-300">{bottom}</span>
-      </span>
-    </div>
-  );
-}
-
 function scrambleFontSize(scramble: string): string {
   const n = scramble.length;
   if (n <= 30) return 'text-4xl';
@@ -267,7 +244,6 @@ export default function TimerPage() {
             <button className="text-xs text-accent inline-flex items-center gap-1" onClick={() => scr.refresh()}>
               <Icon name="refresh" size={13} /> new scramble
             </button>
-            {event === 'sq1' && <Sq1Swatch scheme={settings.sq1ColorScheme} />}
           </div>
 
           {/* Timer card — fills remaining vertical space */}

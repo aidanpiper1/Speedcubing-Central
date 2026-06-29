@@ -1,5 +1,5 @@
 import { Modal } from '../../components/Modal';
-import { useSettings, type Sq1ColorScheme } from '../../store/settings';
+import { useSettings } from '../../store/settings';
 import clsx from 'clsx';
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -109,24 +109,6 @@ export function TimerSettings({ open, onClose }: { open: boolean; onClose: () =>
         <Row label="Start sound" hint="Beep when the timer starts">
           <Toggle checked={s.startSound} onChange={(v) => s.set({ startSound: v })} />
         </Row>
-
-        <div className="pt-3 mt-1">
-          <div className="label">Square-1</div>
-          <Row label="Color scheme" hint="Top color / bottom color of your physical puzzle">
-            <select
-              className={selectCls}
-              value={s.sq1ColorScheme}
-              onChange={(e) => s.set({ sq1ColorScheme: e.target.value as Sq1ColorScheme })}
-            >
-              <option value="white/yellow">White / Yellow</option>
-              <option value="yellow/white">Yellow / White</option>
-              <option value="black/white">Black / White</option>
-              <option value="white/black">White / Black</option>
-              <option value="black/yellow">Black / Yellow</option>
-              <option value="yellow/black">Yellow / Black</option>
-            </select>
-          </Row>
-        </div>
 
         <div className="pt-3 mt-1">
           <div className="label">Stats table columns</div>

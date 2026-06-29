@@ -5,7 +5,6 @@ export type Theme = 'dark' | 'light';
 export type InspectionDirection = 'down' | 'up';
 export type EntryMode = 'keyboard' | 'typing';
 export type TimerUpdate = 'centiseconds' | 'deciseconds' | 'seconds' | 'hidden';
-export type Sq1ColorScheme = 'white/yellow' | 'yellow/white' | 'black/white' | 'white/black' | 'black/yellow' | 'yellow/black';
 
 interface SettingsState {
   theme: Theme;
@@ -23,9 +22,6 @@ interface SettingsState {
   holdToStart: boolean;
   holdDuration: number; // ms the spacebar must be held before the timer is armed
   startSound: boolean;
-
-  // Square-1 color scheme (top/bottom)
-  sq1ColorScheme: Sq1ColorScheme;
 
   // Stats table column toggles
   showBPA: boolean;
@@ -57,8 +53,6 @@ export const useSettings = create<SettingsState>()(
       holdToStart: true,
       holdDuration: 550,
       startSound: false,
-
-      sq1ColorScheme: 'white/yellow' as Sq1ColorScheme,
 
       showBPA: true,
       showWPA: true,
