@@ -120,8 +120,9 @@ export default function TimerPage() {
 
   const runningStr = (ms: number) => {
     if (timerUpdate === 'hidden') return 'solving…';
-    const dec = timerUpdate === 'seconds' ? 0 : timerUpdate === 'deciseconds' ? 1 : 2;
-    return formatTime(Math.round(ms), 'NONE', dec);
+    if (timerUpdate === 'seconds')     return formatTime(Math.floor(ms / 1000) * 1000, 'NONE', 0);
+    if (timerUpdate === 'deciseconds') return formatTime(Math.floor(ms / 100)  * 100,  'NONE', 1);
+    return formatTime(Math.floor(ms / 10) * 10, 'NONE', 2);
   };
 
   const display = useMemo(() => {
@@ -133,7 +134,7 @@ export default function TimerPage() {
       return rem > -2000 ? '+2' : 'DNF';
     }
     if (p === 'running') return runningStr(engine.elapsed);
-    if (p === 'stopped' && newest) return formatTime(newest.time, newest.penalty, solvePrecision);
+    if (p === 'stopped') return formatTime(Math.round(engine.elapsed), 'NONE', solvePrecision);
     if ((p === 'holding' || p === 'ready') && !inspection) return formatTime(0, 'NONE', solvePrecision);
     if (newest) return formatTime(newest.time, newest.penalty, solvePrecision);
     return formatTime(0, 'NONE', solvePrecision);
