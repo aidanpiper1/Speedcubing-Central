@@ -7,11 +7,12 @@ import { api, apiError } from '../../lib/api';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { toast } from '../../store/toast';
-import { WCA_EVENTS, type BattlePublicRoomDTO } from '@scc/shared';
+import { WCA_EVENTS, UNOFFICIAL_EVENTS, type BattlePublicRoomDTO } from '@scc/shared';
 
-const EVENT_OPTIONS = WCA_EVENTS.filter((e) =>
-  ['333', '222', '444', '555', '666', '777', '333oh', 'minx', 'pyram', 'clock', 'skewb', 'sq1'].includes(e.id),
+const WCA_EVENT_OPTIONS = WCA_EVENTS.filter((e) =>
+  ['333', '222', '444', '555', '666', '777', '333oh', '333bf', '444bf', '555bf', 'minx', 'pyram', 'clock', 'skewb', 'sq1'].includes(e.id),
 );
+const UNOFFICIAL_EVENT_OPTIONS = UNOFFICIAL_EVENTS;
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -80,9 +81,16 @@ function CreateRoomModal({ open, onClose }: { open: boolean; onClose: () => void
         <div>
           <label className="label mb-1 block">Event</label>
           <select className="input w-full" value={eventId} onChange={(e) => setEventId(e.target.value)}>
-            {EVENT_OPTIONS.map((ev) => (
-              <option key={ev.id} value={ev.id}>{ev.name}</option>
-            ))}
+            <optgroup label="WCA Events">
+              {WCA_EVENT_OPTIONS.map((ev) => (
+                <option key={ev.id} value={ev.id}>{ev.name}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Unofficial Events">
+              {UNOFFICIAL_EVENT_OPTIONS.map((ev) => (
+                <option key={ev.id} value={ev.id}>{ev.name}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
         <div className="flex items-center justify-between">
@@ -214,14 +222,16 @@ export default function BattleLobby() {
           <span className="text-xs text-muted">Refreshes every 5 s</span>
         </div>
 
-        {!isLoading && publicRooms.length === 0 ? null : (
+        {publicRooms.length === 0 ? (
+          <div className="card p-4 text-sm text-muted text-center">No rooms found</div>
+        ) : (
           <div className="space-y-2">
             {publicRooms.map((room) => (
               <div key={room.code} className="card p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{room.name}</div>
                   <div className="text-xs text-muted mt-0.5">
-                    {WCA_EVENTS.find((e) => e.id === room.eventId)?.name ?? room.eventId}
+                    {[...WCA_EVENTS, ...UNOFFICIAL_EVENTS].find((e) => e.id === room.eventId)?.name ?? room.eventId}
                     {' · '}
                     {room.participantCount} / 10 player{room.participantCount !== 1 ? 's' : ''}
                   </div>
