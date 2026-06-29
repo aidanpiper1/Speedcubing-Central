@@ -63,7 +63,6 @@ export default function LoginPage() {
     <div className="max-w-md mx-auto mt-6">
       <div className="card p-8">
         <h1 className="text-2xl font-bold mb-1">{mode === 'login' ? 'Log in' : 'Create account'}</h1>
-        <p className="text-muted text-sm mb-6">Sign in to save solves, set goals, and battle other cubers.</p>
 
         {wcaError && (
           <div className="mb-4 text-sm bg-yellow-500/15 text-yellow-500 dark:text-yellow-400 rounded-lg px-3 py-2">
