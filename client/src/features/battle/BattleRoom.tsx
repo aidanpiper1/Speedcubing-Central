@@ -307,6 +307,10 @@ export default function BattleRoom() {
     if (room?.status === 'WAITING') {
       return { label: 'Waiting', color: 'grey' as const };
     }
+    // Show submitted time immediately for self before server room_state confirms.
+    if (p.id === myId && submitted) {
+      return { label: formatTime(pendingTime, pendingPenalty, settings.solvePrecision), color: 'green' as const };
+    }
     if (p.finishedAt) return { label: formatTime(p.time, p.penalty ?? 'NONE'), color: 'green' as const };
     return { label: 'Solving…', color: 'yellow' as const };
   }
