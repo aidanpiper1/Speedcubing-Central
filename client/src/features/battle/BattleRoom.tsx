@@ -451,23 +451,8 @@ export default function BattleRoom() {
                   <span className="font-mono font-semibold text-accent">{room.code}</span>
                 </div>
               ) : (
-                <div className="text-sm text-muted text-center">
-                  {room.participants.every((p) => p.ready)
-                    ? 'Starting…'
-                    : 'All players must ready up to start'}
-                </div>
+                <div className="text-sm text-muted text-center">Next round starting in a moment…</div>
               )}
-              <button
-                className={clsx(
-                  'px-8 py-3 rounded-xl font-semibold text-lg transition-all',
-                  room.participants.find((p) => p.id === myId)?.ready
-                    ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/30'
-                    : 'bg-accent text-white hover:bg-accent/90',
-                )}
-                onClick={() => code && toggleReady(code.toUpperCase())}
-              >
-                {room.participants.find((p) => p.id === myId)?.ready ? 'Unready' : 'Ready Up'}
-              </button>
             </div>
           ) : submitted ? (
             /* Submitted — waiting for others */

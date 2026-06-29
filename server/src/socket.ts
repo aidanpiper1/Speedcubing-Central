@@ -63,7 +63,51 @@ export function attachSocket(server: HttpServer): IOServer {
     cors: { origin: env.FRONTEND_URL, credentials: true },
   });
 
-  // Check round completion and emit results + reset if all in-round participants are done.
+  // Pending auto-start timers keyed by room code.
+  const autoStartTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  async function broadcastRoomState(code: string) {
+    const dto = await buildRoomDTO(code);
+    if (dto) io.to(code).emit('room_state', dto);
+  }
+
+  // Start a round automatically once enough players are present.
+  async function autoStartRound(code: string): Promise<void> {
+    const room = await prisma.battleRoom.findUnique({
+      where: { code },
+      include: { participants: true },
+    });
+    if (!room || room.status !== 'WAITING' || room.participants.length < 2) return;
+
+    const scramble = await getScramble(room.eventId);
+    const roundNumber = room.roundNumber + 1;
+
+    await prisma.battleParticipant.updateMany({
+      where: { roomId: room.id },
+      data: { ready: true },
+    });
+    await prisma.battleRoom.update({
+      where: { id: room.id },
+      data: { status: 'ACTIVE', scramble, roundNumber },
+    });
+
+    io.to(code).emit('round_start', { scramble, roundNumber });
+    await broadcastRoomState(code);
+  }
+
+  function scheduleAutoStart(code: string, delayMs: number) {
+    const existing = autoStartTimers.get(code);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      autoStartTimers.delete(code);
+      autoStartRound(code).catch((e) =>
+        console.error('[socket] autoStartRound error:', e instanceof Error ? e.message : e),
+      );
+    }, delayMs);
+    autoStartTimers.set(code, timer);
+  }
+
+  // Check round completion and emit results + schedule next round.
   async function checkRoundCompletion(code: string): Promise<void> {
     const room = await prisma.battleRoom.findUnique({
       where: { code },
@@ -116,16 +160,14 @@ export function attachSocket(server: HttpServer): IOServer {
     });
 
     io.to(code).emit('round_result', { results, roundNumber: room.roundNumber });
+
+    // Auto-start the next round after 5 seconds so players can see results.
+    scheduleAutoStart(code, 5000);
   }
 
   io.on('connection', (socket) => {
     let myParticipantId: string | null = null;
     let myCode: string | null = null;
-
-    async function emitRoomState(code: string) {
-      const dto = await buildRoomDTO(code);
-      if (dto) io.to(code).emit('room_state', dto);
-    }
 
     const safe =
       <A extends unknown[]>(fn: (...args: A) => Promise<void>) =>
@@ -185,49 +227,13 @@ export function attachSocket(server: HttpServer): IOServer {
         myParticipantId = participant.id;
         myCode = code;
         socket.join(code);
-        await emitRoomState(code);
-      }),
-    );
+        await broadcastRoomState(code);
 
-    socket.on(
-      'toggle_ready',
-      safe(async ({ code }) => {
-        code = code.toUpperCase();
-        if (!myParticipantId) return;
-        const room = await prisma.battleRoom.findUnique({
-          where: { code },
-          include: { participants: true },
-        });
-        if (!room || room.status !== 'WAITING') return;
-
-        const me = room.participants.find((p) => p.id === myParticipantId);
-        if (!me) return;
-
-        await prisma.battleParticipant.update({
-          where: { id: myParticipantId },
-          data: { ready: !me.ready },
-        });
-
-        // Re-fetch to check if everyone is ready.
-        const updated = await prisma.battleRoom.findUnique({
-          where: { code },
-          include: { participants: true },
-        });
-        if (!updated) return;
-
-        const allReady =
-          updated.participants.length >= 2 && updated.participants.every((p) => p.ready);
-        if (allReady) {
-          const scramble = await getScramble(room.eventId);
-          const roundNumber = room.roundNumber + 1;
-          await prisma.battleRoom.update({
-            where: { id: room.id },
-            data: { status: 'ACTIVE', scramble, roundNumber },
-          });
-          io.to(code).emit('round_start', { scramble, roundNumber });
+        // If room is WAITING and now has 2+ players, schedule auto-start.
+        if (room.status === 'WAITING') {
+          const count = existing ? room.participants.length : room.participants.length + 1;
+          if (count >= 2) scheduleAutoStart(code, 3000);
         }
-
-        await emitRoomState(code);
       }),
     );
 
@@ -258,7 +264,7 @@ export function attachSocket(server: HttpServer): IOServer {
         });
 
         await checkRoundCompletion(code);
-        await emitRoomState(code);
+        await broadcastRoomState(code);
       }),
     );
 
@@ -292,7 +298,7 @@ export function attachSocket(server: HttpServer): IOServer {
           await checkRoundCompletion(code);
         }
         await deleteRoomIfEmpty(code);
-        await emitRoomState(code);
+        await broadcastRoomState(code);
         myCode = null;
       }),
     );
@@ -317,7 +323,7 @@ export function attachSocket(server: HttpServer): IOServer {
         }
         await prisma.battleParticipant.deleteMany({ where: { id: myParticipantId } });
         await deleteRoomIfEmpty(code);
-        await emitRoomState(code);
+        await broadcastRoomState(code);
       } catch {
         /* room may be gone */
       }
