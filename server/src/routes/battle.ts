@@ -95,7 +95,6 @@ router.get('/:code', async (req, res, next) => {
         userId: p.userId,
         name: p.guestName ?? 'Player',
         points: p.points,
-        ready: p.ready,
         time: p.time,
         penalty: p.penalty,
         finishedAt: p.finishedAt?.toISOString() ?? null,
