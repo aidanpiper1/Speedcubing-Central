@@ -7,7 +7,7 @@ export const EG1_SET: AlgSet = {
   description: 'EG-1: Bottom layer has one solved corner (2×2)',
   cases: [
     // Anti-Sune
-    { id: 'EG1-AS-1', name: 'EG1 AS 1', group: 'Anti-Sune', moves: "y U2 B U' R2 F2 U' F", probability: '—', alts: ["y R' F R2 U R' F' U' R U' R'", "y U' L' U' L U' F' L' U L2 F L'", "y L' U L2 F L' F' U' L F' L'"] },
+    { id: 'EG1-AS-1', name: 'EG1 AS 1', group: 'Anti-Sune', moves: "y U2 B U' R2 F2 U' F", probability: '—', diagramSuffix: 'x2', alts: ["y R' F R2 U R' F' U' R U' R'", "y U' L' U' L U' F' L' U L2 F L'", "y L' U L2 F L' F' U' L F' L'"] },
     { id: 'EG1-AS-2', name: 'EG1 AS 2', group: 'Anti-Sune', moves: "U R U' R' F' U' F2 R U' R'", probability: '—', alts: ["U2 L' U' L F2 U' F' L' U' L", "R U' F2 R U2 R U' F", "F R U' R' U R' F' R U F' R U R' U"] },
     { id: 'EG1-AS-3', name: 'EG1 AS 3', group: 'Anti-Sune', moves: "F' R U R' U' R U R2 F' R", probability: '—', alts: ["U' R U' R' U2 R' F R2 U2 R' F", "F' L F L' U' L F L2 U' L", "F' L F L' U' R U R' L' U' L"] },
     { id: 'EG1-AS-4', name: 'EG1 AS 4', group: 'Anti-Sune', moves: "R U' R' F' U' R U R' U' F", probability: '—', alts: ["U F R U' R2 F' R U F' R U R'", "U' R' F R F' U R U' R2 F' R F", "U2 F U' L' U L U' F' L' U' L"] },
