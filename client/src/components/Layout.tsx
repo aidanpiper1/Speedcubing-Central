@@ -16,7 +16,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: 'home' },
   { to: '/timer', label: 'Timer', icon: 'timer' },
   { to: '/calculator', label: 'Calculator', icon: 'calculator' },
-  { to: '/alg-trainer', label: 'Alg Trainer', icon: 'cube' },
+  { to: '/alg-trainer', label: 'Alg Library', icon: 'cube' },
   { to: '/battle', label: 'Battle', icon: 'swords' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];

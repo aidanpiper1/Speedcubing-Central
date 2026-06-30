@@ -5,7 +5,7 @@ import { Icon, type IconName } from '../../components/Icon';
 const TILES: { to: string; icon: IconName; label: string; description: string }[] = [
   { to: '/timer', icon: 'timer', label: 'Timer', description: 'Time your solves with inspection, sessions, and live averages.' },
   { to: '/calculator', icon: 'calculator', label: 'Calculator', description: 'Calculate Ao5 and Mo3 averages and find your target time.' },
-  { to: '/alg-trainer', icon: 'cube', label: 'Alg Trainer', description: 'Browse and learn OLL, PLL, F2L, and COLL algorithms.' },
+  { to: '/alg-trainer', icon: 'cube', label: 'Alg Library', description: 'Browse and learn OLL, PLL, F2L, and COLL algorithms.' },
 ];
 
 export default function Dashboard() {

@@ -118,7 +118,7 @@ export default function AlgTrainerPage() {
 
   return (
     <div>
-      <PageHeader title="Algorithm Trainer" subtitle="Browse OLL, PLL, F2L, and COLL cases." />
+      <PageHeader title="Algorithm Library" subtitle="Browse OLL, PLL, F2L, and COLL cases." />
 
       {/* Set selector */}
       <div className="flex flex-wrap gap-2 mb-4">
