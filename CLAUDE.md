@@ -15,7 +15,8 @@ tools, real-time Battle Mode, 3D reconstruction viewer, BLD trainer, and more.
 | Realtime   | Socket.io (Battle Mode)                                           |
 | Auth       | WCA OAuth 2.0 + JWT email/password fallback (httpOnly cookies)    |
 | Scrambles  | `cubing.js` random-state (TNoodle-quality), `scrambow` fallback   |
-| 3D cube    | `cubing.js` (`<twisty-player>`) for reconstruction               |
+| 3D cube    | `cubing.js` (`<twisty-player>`) for reconstruction & alg diagrams |
+| Puzzle icons | `@cubing/icons` CSS icon library (`<span className="cubing-icon event-333">`) |
 | Charts     | `recharts` (improvement graphs)                                   |
 
 This is an **npm workspaces monorepo** with three packages: `shared`, `server`, `client`.
@@ -27,7 +28,7 @@ This is an **npm workspaces monorepo** with three packages: `shared`, `server`, 
 ├── client/                 # React + Vite SPA
 │   └── src/
 │       ├── components/      # Layout, nav, toasts, CubeDiagram, shared UI
-│       ├── data/           # Hardcoded alg sets (OLL/PLL/F2L/COLL/ZBLL), Speffz lettering
+│       ├── data/           # Hardcoded alg sets (OLL/PLL/F2L/COLL/ZBLL + 2×2 OrtegaOLL/PBL/CLL/EG-1/EG-2), Speffz lettering
 │       ├── features/       # One folder per feature (see Routes below)
 │       ├── lib/            # axios api client, scramble helper
 │       ├── store/          # Zustand stores: auth, settings, toast
@@ -107,7 +108,7 @@ backend, so no CORS setup is needed in development.
 | `/`                 | Landing (logged out) / Dashboard (logged in)                    |
 | `/timer`            | Timer — spacebar/touch, inspection, live Ao5/12/50/100, sessions |
 | `/calculator`       | Average / mean calculator (Ao5…Ao100, Mo3, MoX)                  |
-| `/alg-trainer`      | OLL/PLL/F2L/COLL/ZBLL — browse, drill, recognition, custom algs  |
+| `/alg-trainer`      | Algorithm Library — puzzle picker (3×3 + 2×2), browse, drill, recognition; 3×3: OLL/PLL/F2L/COLL/ZBLL; 2×2: OrtegaOLL/PBL/CLL/EG-1/EG-2 |
 | `/rankings`         | WCA rankings + competitor lookup (proxied)                       |
 | `/competitions`     | Upcoming comps + cutoff predictor                                |
 | `/battle`, `/battle/:roomId` | Real-time head-to-head Battle Mode (Socket.io)          |
@@ -141,7 +142,17 @@ backend, so no CORS setup is needed in development.
 - **Daily scrambles** are fixed per `(date, event)` by persistence: the first request that
   day generates and stores the scramble, and everyone else reads the stored one.
 - **Alg data** is hardcoded in `client/src/data/` (full OLL 57, PLL 21, F2L 41, COLL 40,
-  ZBLL subset). Spaced repetition uses SM-2, persisted per user at `/api/alg/review`.
+  ZBLL subset; 2×2: OrtegaOLL 7, PBL 6, CLL 42, EG-1 42, EG-2 42). Spaced repetition uses
+  SM-2, persisted per user at `/api/alg/review`.
+- **Alg diagrams** use `cubing.js` `<twisty-player>` with `experimentalSetupAlg = 'x2 ' + invertAlg(moves)`
+  to display the unsolved case from above. `puzzle` prop supports `'3x3x3'` and `'2x2x2'`.
+  `AlgCase.diagramPrefix` can prepend extra moves to the setup alg for orientation corrections
+  (e.g. EG-1 AS 1 uses `diagramPrefix: 'x2'`). F2L cases have `slotAlts` (per-slot orientation
+  tabs: Front Right / Front Left / Back Left / Back Right). All diagram components live in
+  `client/src/components/CubeDiagram.tsx`.
+- **Puzzle icons** use `@cubing/icons` (`import '@cubing/icons'`), rendered as
+  `<span className="cubing-icon event-222" />`. The Algorithm Library landing shows 3×3 and
+  2×2 as available; Square-1, Megaminx, Pyraminx, Skewb are marked "Coming Soon".
 - **Security:** helmet, per-IP rate limiting on `/api`, CORS locked to `FRONTEND_URL`, and a
   central error handler that never leaks stack traces to clients.
 
