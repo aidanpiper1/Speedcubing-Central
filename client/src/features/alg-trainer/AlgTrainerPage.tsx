@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import '@cubing/icons';
 import { PageHeader, Badge } from '../../components/ui';
-import { OllDiagram, PllDiagram, CollDiagram, F2LDiagram, RotatingCaseDiagram, invertAlg } from '../../components/CubeDiagram';
+import { OllDiagram, PllDiagram, CollDiagram, F2LDiagram, TwoByTwoDiagram, RotatingCaseDiagram, invertAlg } from '../../components/CubeDiagram';
 import { ALG_SETS, getSet, type AlgCase, type AlgSet } from '../../data/algSets';
 import { Icon } from '../../components/Icon';
 
@@ -173,7 +173,7 @@ function CaseImage({ c, set, size = 80 }: { c: AlgCase; set: AlgSet; size?: numb
   if (set.kind === 'oll') return <OllDiagram alg={c.moves} size={size} />;
   if (set.kind === 'coll') return <CollDiagram alg={c.moves} size={size} />;
   if (['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind)) {
-    return <CubingIcon event="222" className="text-[64px]" />;
+    return <TwoByTwoDiagram alg={c.moves} size={size} />;
   }
   return <F2LDiagram alg={c.moves} size={size} />;
 }
@@ -255,7 +255,12 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
           <button onClick={onClose} className="btn-ghost text-lg leading-none px-2 py-1">✕</button>
         </div>
         <div className="flex justify-center">
-          <RotatingCaseDiagram alg={c.moves} size={280} defaultLat={set.kind === 'f2l' ? 15 : 30} />
+          <RotatingCaseDiagram
+            alg={c.moves}
+            size={280}
+            defaultLat={set.kind === 'f2l' ? 15 : 30}
+            puzzle={['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind) ? '2x2x2' : '3x3x3'}
+          />
         </div>
         <div>
           <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Setup (apply to solved cube)</div>

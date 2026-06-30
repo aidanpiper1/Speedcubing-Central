@@ -30,7 +30,7 @@ export function invertAlg(alg: string): string {
 }
 
 
-function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number) {
+function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number, puzzle = '3x3x3') {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!alg) return;
   const el = document.createElement('twisty-player') as TwistyEl;
@@ -43,7 +43,7 @@ function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: numb
   el.setAttribute('camera-latitude', String(lat));
   el.setAttribute('camera-longitude', String(lon));
   container.appendChild(el);
-  el.puzzle = '3x3x3';
+  el.puzzle = puzzle;
   el.visualization = 'PG3D';
   el.alg = '';
   el.experimentalSetupAlg = 'x2 ' + invertAlg(alg);
@@ -75,10 +75,17 @@ export function F2LDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
+// 2x2 top-down view (OLL / CLL / EG).
+export function TwoByTwoDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2'); }, [alg, size]);
+  return <div ref={ref} style={{ width: size, height: size }} />;
+}
+
 // Auto-rotating 3D viewer for the case detail modal.
 // Slowly spins around the Y axis; dragging overrides rotation and snaps
 // latitude back to the default angle on release.
-export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30 }: { alg: string; size?: number; defaultLat?: number }) {
+export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3' }: { alg: string; size?: number; defaultLat?: number; puzzle?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const elRef = useRef<TwistyEl | null>(null);
   const lon = useRef(25);
@@ -105,7 +112,7 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30 }: { alg:
     el.setAttribute('camera-longitude', String(lon.current));
     wrap.appendChild(el);
     elRef.current = el;
-    el.puzzle = '3x3x3';
+    el.puzzle = puzzle;
     el.visualization = 'PG3D';
     el.alg = '';
     el.experimentalSetupAlg = 'x2 ' + invertAlg(alg);
