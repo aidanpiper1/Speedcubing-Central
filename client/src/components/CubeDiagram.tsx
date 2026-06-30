@@ -39,8 +39,8 @@ export function invertAlg(alg: string): string {
 // Each piece has 5 facelet slots; facelet 0 is the primary (U/D face).
 const F = (a: string, b: string): { facelets: string[] } => ({ facelets: [a, b, b, b, b] });
 const REG  = F('regular', 'regular');  // all facelets shown
-const DIM  = F('dim',     'dim');      // all facelets dimmed
-const TOP  = F('regular', 'dim');      // primary (yellow) shown, sides dimmed
+const DIM  = F('ignored', 'ignored');  // all facelets grayed out
+const TOP  = F('regular', 'ignored'); // primary (yellow) shown, sides grayed out
 
 function buildStickeringMask(kind: StickeringKind, puzzle: string): unknown {
   if (kind === 'full' || kind === 'pll') return null;
