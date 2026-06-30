@@ -595,6 +595,11 @@ function formatTime(ms: number): string {
   return s < 60 ? s.toFixed(2) : `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
 }
 
+interface TrainerSettings {
+  inputMethod: 'keyboard' | 'manual';
+  showCaseName: boolean;
+}
+
 function TrainingSession({
   cases, setId, prefs, onBack,
 }: {
@@ -605,26 +610,27 @@ function TrainingSession({
 }) {
   const set = getSet(setId)!;
 
-  // Pick a random case
+  const [settings, setSettings] = useState<TrainerSettings>({ inputMethod: 'keyboard', showCaseName: true });
+  const [showSettings, setShowSettings] = useState(false);
+
   const [caseIndex, setCaseIndex] = useState(() => Math.floor(Math.random() * cases.length));
   const currentCase = cases[caseIndex];
   const preferredAlg = effectiveAlg(currentCase, prefs[currentCase.id]);
 
-  // Pick a random alg (main + alts) for the scramble each time the case changes.
+  // Use an alternate as the scramble so it's never the preferred alg.
   const randomAlg = useMemo(() => {
-    const pool = [currentCase.moves, ...(currentCase.alts ?? [])];
+    const alts = currentCase.alts ?? [];
+    const pool = alts.length > 0 ? alts : [currentCase.moves];
     return pool[Math.floor(Math.random() * pool.length)];
   }, [currentCase]);
 
   const scramble = useMemo(() => invertAlg(randomAlg), [randomAlg]);
-  // Solution shown move-by-move uses the preferred alg.
   const moves = useMemo(() => parseMoves(preferredAlg), [preferredAlg]);
 
   const [revealed, setRevealed] = useState(0);
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'stopped'>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [manualInput, setManualInput] = useState('');
-  const [showManual, setShowManual] = useState(false);
   const startTime = useRef<number>(0);
   const rafId = useRef<number | null>(null);
 
@@ -634,7 +640,6 @@ function TrainingSession({
     setTimerState('idle');
     setElapsed(0);
     setManualInput('');
-    setShowManual(false);
   }, [cases]);
 
   // Timer loop
@@ -653,6 +658,12 @@ function TrainingSession({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
+      if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        setRevealed((r) => Math.min(r + 1, moves.length));
+        return;
+      }
+      if (settings.inputMethod !== 'keyboard') return;
       if (e.code === 'Space') {
         e.preventDefault();
         if (timerState === 'idle') {
@@ -665,59 +676,99 @@ function TrainingSession({
           nextCase();
         }
       }
-      if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        setRevealed((r) => Math.min(r + 1, moves.length));
-      }
-      if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        setRevealed((r) => Math.max(r - 1, 0));
-      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [timerState, nextCase, moves.length]);
+  }, [timerState, nextCase, moves.length, settings.inputMethod]);
 
   const submitManual = () => {
     const val = parseFloat(manualInput.replace(',', '.'));
     if (!isNaN(val) && val > 0) {
       setElapsed(Math.round(val * 1000));
       setTimerState('stopped');
-      setShowManual(false);
       setManualInput('');
     }
   };
 
+  const setSetting = <K extends keyof TrainerSettings>(key: K, val: TrainerSettings[K]) =>
+    setSettings((s) => ({ ...s, [key]: val }));
+
   return (
     <div>
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <button onClick={onBack} className="btn-ghost flex items-center gap-1">
-          <Icon name="arrowLeft" size={14} /> Cases
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2 text-sm">
+          <button onClick={onBack} className="btn-ghost flex items-center gap-1">
+            <Icon name="arrowLeft" size={14} /> Cases
+          </button>
+          <span className="text-muted">/</span>
+          <span className="font-semibold">{set.name} Trainer</span>
+        </div>
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          className={clsx('btn-ghost flex items-center gap-1.5 text-sm', showSettings && 'text-accent')}
+        >
+          <Icon name="gear" size={15} /> Settings
         </button>
-        <span className="text-muted">/</span>
-        <span className="font-semibold">{set.name} Trainer</span>
       </div>
 
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="card p-5 mb-6 flex flex-col gap-5">
+          <div>
+            <div className="label mb-2">Input Method</div>
+            <div className="flex gap-2">
+              {(['keyboard', 'manual'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setSetting('inputMethod', m)}
+                  className={clsx('px-3 py-1.5 rounded text-sm font-semibold capitalize transition-colors',
+                    settings.inputMethod === m ? 'bg-accent text-white' : 'bg-card-hover text-muted hover:text-primary')}
+                >
+                  {m === 'keyboard' ? 'Keyboard (spacebar)' : 'Manual input'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="label mb-2">After Stopping</div>
+            <div className="flex gap-2">
+              {([true, false] as const).map((v) => (
+                <button
+                  key={String(v)}
+                  onClick={() => setSetting('showCaseName', v)}
+                  className={clsx('px-3 py-1.5 rounded text-sm font-semibold transition-colors',
+                    settings.showCaseName === v ? 'bg-accent text-white' : 'bg-card-hover text-muted hover:text-primary')}
+                >
+                  {v ? 'Show case name' : 'Hide case name'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Left: diagram + move reveal */}
+        {/* Left: diagram + scramble + move reveal */}
         <div className="flex flex-col items-center gap-4">
-          <div className="card p-4 flex flex-col items-center gap-3 w-full">
-            <div className="text-sm font-semibold text-muted">Scramble</div>
+          <div className="card p-5 flex flex-col items-center gap-3 w-full">
             <RotatingCaseDiagram
               alg={randomAlg}
-              size={260}
+              size={280}
               defaultLat={30}
               puzzle={IS_2x2(set.kind) ? '2x2x2' : '3x3x3'}
               diagramPrefix={currentCase.diagramPrefix}
               stickering={rotatingStickering(set.kind)}
             />
-            <div className="font-mono text-xs text-muted text-center break-all">{scramble}</div>
+            <div className="font-mono text-base font-semibold text-primary text-center leading-relaxed break-all">
+              {scramble}
+            </div>
           </div>
 
           {/* Move reveal */}
           <div className="card p-4 w-full">
             <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3 flex items-center justify-between">
-              <span>Solution — ← → to reveal</span>
+              <span>Solution — <kbd className="kbd">→</kbd> to reveal</span>
               <span className="text-accent">{revealed}/{moves.length}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -735,7 +786,7 @@ function TrainingSession({
             </div>
           </div>
 
-          {timerState === 'stopped' && (
+          {timerState === 'stopped' && settings.showCaseName && (
             <div className="card p-3 w-full text-center text-sm text-muted">
               <span className="font-bold text-primary">{currentCase.name}</span>
               <span className="mx-2">·</span>
@@ -747,51 +798,46 @@ function TrainingSession({
         {/* Right: timer */}
         <div className="flex flex-col items-center justify-center gap-6">
           <div className={clsx(
-            'text-6xl font-mono font-bold tracking-tight transition-colors',
+            'text-8xl font-mono font-bold tracking-tight transition-colors tabular-nums',
             timerState === 'running' ? 'text-accent' : 'text-primary',
           )}>
             {formatTime(elapsed)}
           </div>
 
-          <div className="flex flex-col items-center gap-2 text-sm text-muted">
-            {timerState === 'idle' && <span>Press <kbd className="kbd">Space</kbd> to start</span>}
-            {timerState === 'running' && <span>Press <kbd className="kbd">Space</kbd> to stop</span>}
-            {timerState === 'stopped' && <span>Press <kbd className="kbd">Space</kbd> for next case</span>}
-          </div>
-
-          <div className="flex gap-3">
-            {timerState === 'stopped' && (
-              <button onClick={nextCase} className="btn-primary px-5 py-2">
-                Next case
-              </button>
-            )}
-            {timerState !== 'running' && (
-              <button onClick={() => setShowManual((v) => !v)} className="btn-ghost px-4 py-2 text-sm">
-                Manual input
-              </button>
-            )}
-          </div>
-
-          {showManual && timerState !== 'running' && (
-            <div className="flex gap-2">
-              <input
-                autoFocus
-                type="text"
-                placeholder="e.g. 12.34"
-                value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submitManual()}
-                className="input w-32 text-center font-mono"
-              />
-              <button onClick={submitManual} className="btn-primary px-3 py-2 text-sm">Set</button>
+          {settings.inputMethod === 'keyboard' ? (
+            <div className="flex flex-col items-center gap-2 text-sm text-muted">
+              {timerState === 'idle' && <span>Press <kbd className="kbd">Space</kbd> to start</span>}
+              {timerState === 'running' && <span>Press <kbd className="kbd">Space</kbd> to stop</span>}
+              {timerState === 'stopped' && <span>Press <kbd className="kbd">Space</kbd> for next case</span>}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              {timerState !== 'stopped' ? (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus={timerState === 'idle'}
+                    type="text"
+                    placeholder="e.g. 12.34"
+                    value={manualInput}
+                    onChange={(e) => setManualInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitManual()}
+                    className="input w-36 text-center font-mono text-lg"
+                  />
+                  <button onClick={submitManual} className="btn-primary px-4 py-2">Set</button>
+                </div>
+              ) : (
+                <button onClick={nextCase} className="btn-primary px-6 py-2.5">
+                  Next case
+                </button>
+              )}
             </div>
           )}
 
-          <div className="text-center text-xs text-muted mt-4">
-            <div className="mb-1">Case {caseIndex + 1} of {cases.length}</div>
-            <kbd className="kbd">←</kbd><kbd className="kbd ml-1">→</kbd>
-            <span className="ml-2">reveal moves</span>
-          </div>
+          {settings.inputMethod === 'keyboard' && timerState === 'stopped' && (
+            <button onClick={nextCase} className="btn-primary px-6 py-2.5">
+              Next case
+            </button>
+          )}
         </div>
       </div>
     </div>
