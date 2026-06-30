@@ -26,8 +26,8 @@ export function invertAlg(alg: string): string {
       if (move.endsWith('2')) return move;
       return move + "'";
     })
-    .filter((move) => !/^[xyz]['2]?$/.test(move))
-    .join(' ');
+    .join(' ')
+    .replace(/(\s+[xyz]['2]?)+$/, '');
 }
 
 
