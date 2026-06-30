@@ -241,9 +241,19 @@ export default function TimerPage() {
             <div className={`${scrambleFontSize(scr.scramble)} font-mono tracking-wide break-words w-full text-center`}>
               {scr.loading ? <span className="text-muted text-base">Scrambling…</span> : scr.scramble || '—'}
             </div>
-            <button className="text-xs text-accent inline-flex items-center gap-1" onClick={() => scr.refresh()}>
-              <Icon name="refresh" size={13} /> new scramble
-            </button>
+            <div className="flex items-center gap-3">
+              <button className="text-xs text-accent inline-flex items-center gap-1" onClick={() => scr.refresh()}>
+                <Icon name="refresh" size={13} /> new scramble
+              </button>
+              {!scr.loading && !scr.randomState && (
+                <span
+                  className="text-xs text-yellow-500 font-semibold"
+                  title="Could not generate a random-state scramble — using random-move instead"
+                >
+                  ⚠ random-move
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Timer card — fills remaining vertical space */}

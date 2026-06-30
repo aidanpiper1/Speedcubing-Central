@@ -19,7 +19,7 @@ export function generateScramble(eventId: string): string {
 }
 
 // WCA-quality random-state scramble via cubing.js; synchronous scrambow fallback.
-export async function getScramble(eventId: string): Promise<string> {
+export async function getScramble(eventId: string): Promise<{ scramble: string; randomState: boolean }> {
   try {
     const timeoutMs = 15_000;
     const { randomScrambleForEvent } = await import('cubing/scramble');
@@ -29,9 +29,9 @@ export async function getScramble(eventId: string): Promise<string> {
         setTimeout(() => reject(new Error('cubing.js timeout')), timeoutMs),
       ),
     ]);
-    return normalizeScramble(alg.toString());
+    return { scramble: normalizeScramble(alg.toString()), randomState: true };
   } catch (e) {
-    console.warn('[scramble] cubing.js failed, falling back:', e instanceof Error ? e.message : e);
+    console.warn('[scramble] cubing.js failed, falling back to random-move:', e instanceof Error ? e.message : e);
   }
-  return generateScramble(eventId);
+  return { scramble: generateScramble(eventId), randomState: false };
 }
