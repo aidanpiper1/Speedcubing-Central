@@ -26,7 +26,7 @@ const PUZZLES = [
 function PuzzleLanding({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <div>
-      <PageHeader title="Algorithm Library" subtitle="Select a puzzle to browse algorithms." />
+      <PageHeader title="Algorithms" subtitle="Select a puzzle to browse algorithms." />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {PUZZLES.map((p) => (
           <button
