@@ -8,7 +8,7 @@ export interface AlgCase {
   probability: string; // e.g. "1/54"
   alts?: string[];     // alternate algorithms for the same case
   slotAlts?: Record<string, string[]>; // F2L: algs per slot position (Front Right, Front Left, etc.)
-  diagramSuffix?: string; // extra moves appended to experimentalSetupAlg (hidden from UI)
+  diagramPrefix?: string; // extra moves prepended before x2 in experimentalSetupAlg (hidden from UI)
   oll?: OllPattern;
   pll?: PllArrow[];
 }
