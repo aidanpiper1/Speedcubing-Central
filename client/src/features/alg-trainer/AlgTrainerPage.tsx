@@ -1,191 +1,26 @@
 import { useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
+import '@cubing/icons';
 import { PageHeader, Badge } from '../../components/ui';
 import { OllDiagram, PllDiagram, CollDiagram, F2LDiagram, RotatingCaseDiagram, invertAlg } from '../../components/CubeDiagram';
 import { ALG_SETS, getSet, type AlgCase, type AlgSet } from '../../data/algSets';
 import { Icon } from '../../components/Icon';
 
 // ---------------------------------------------------------------------------
-// Puzzle SVG icons (WCA-style front-face views)
-// ---------------------------------------------------------------------------
-
-function Icon3x3({ size = 64 }: { size?: number }) {
-  const s = size;
-  const gap = s * 0.04;
-  const cell = (s - gap * 4) / 3;
-  const colors = ['#ff0000','#ff0000','#ff0000','#ff0000','#ff0000','#ff0000','#ff0000','#ff0000','#ff0000'];
-  return (
-    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      {colors.map((c, i) => {
-        const col = i % 3;
-        const row = Math.floor(i / 3);
-        const x = gap + col * (cell + gap);
-        const y = gap + row * (cell + gap);
-        return <rect key={i} x={x} y={y} width={cell} height={cell} rx={cell * 0.12} fill={c} />;
-      })}
-    </svg>
-  );
-}
-
-function Icon2x2({ size = 64 }: { size?: number }) {
-  const s = size;
-  const gap = s * 0.05;
-  const cell = (s - gap * 3) / 2;
-  return (
-    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      {[0,1,2,3].map(i => {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const x = gap + col * (cell + gap);
-        const y = gap + row * (cell + gap);
-        return <rect key={i} x={x} y={y} width={cell} height={cell} rx={cell * 0.12} fill="#ff0000" />;
-      })}
-    </svg>
-  );
-}
-
-function IconSq1({ size = 64 }: { size?: number }) {
-  const s = size;
-  const cx = s / 2, cy = s / 2, r = s * 0.44;
-  // Square-1 top face: 8 pieces — 4 corners (60°) + 4 edges (30°)
-  // Alternating wedges: corner=60deg, edge=30deg
-  const pieces: { start: number; span: number; fill: string }[] = [];
-  const fills = ['#ff0000','#ff7700','#ff0000','#ff7700','#ff0000','#ff7700','#ff0000','#ff7700'];
-  let angle = -90;
-  const spans = [60, 30, 60, 30, 60, 30, 60, 30];
-  spans.forEach((span, i) => {
-    pieces.push({ start: angle, span, fill: fills[i] });
-    angle += span;
-  });
-  function wedge(start: number, span: number) {
-    const toRad = (d: number) => (d * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(toRad(start));
-    const y1 = cy + r * Math.sin(toRad(start));
-    const x2 = cx + r * Math.cos(toRad(start + span));
-    const y2 = cy + r * Math.sin(toRad(start + span));
-    const large = span > 180 ? 1 : 0;
-    return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-  }
-  return (
-    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      <circle cx={cx} cy={cy} r={r} fill="#1a1a1a" />
-      {pieces.map((p, i) => (
-        <path key={i} d={wedge(p.start, p.span)} fill={p.fill} stroke="#1a1a1a" strokeWidth={s * 0.025} />
-      ))}
-    </svg>
-  );
-}
-
-function IconMegaminx({ size = 64 }: { size?: number }) {
-  const s = size;
-  const cx = s / 2, cy = s / 2, r = s * 0.44;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  // Pentagon + 5 surrounding pentagons (simplified as a dodecahedron face)
-  function pentagon(cx2: number, cy2: number, r2: number, rot = 0) {
-    const pts = Array.from({ length: 5 }, (_, i) => {
-      const a = toRad(rot + i * 72 - 90);
-      return `${cx2 + r2 * Math.cos(a)},${cy2 + r2 * Math.sin(a)}`;
-    });
-    return pts.join(' ');
-  }
-  const innerR = r * 0.38;
-  const outerR = r * 0.36;
-  const dist = r * 0.6;
-  const fills = ['#ff0000','#ff7700','#ffff00','#00bb00','#0000ff','#ffffff'];
-  return (
-    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      <circle cx={cx} cy={cy} r={r} fill="#1a1a1a" />
-      {/* 5 outer faces */}
-      {[0,1,2,3,4].map(i => {
-        const a = toRad(i * 72 - 90);
-        const fx = cx + dist * Math.cos(a);
-        const fy = cy + dist * Math.sin(a);
-        return <polygon key={i} points={pentagon(fx, fy, outerR, i * 72)} fill={fills[i + 1]} stroke="#1a1a1a" strokeWidth={s * 0.025} />;
-      })}
-      {/* Center face */}
-      <polygon points={pentagon(cx, cy, innerR)} fill={fills[0]} stroke="#1a1a1a" strokeWidth={s * 0.025} />
-    </svg>
-  );
-}
-
-function IconPyraminx({ size = 64 }: { size?: number }) {
-  const s = size;
-  const pad = s * 0.06;
-  // Equilateral triangle subdivided 3×3
-  const top = { x: s / 2, y: pad };
-  const bl  = { x: pad, y: s - pad };
-  const br  = { x: s - pad, y: s - pad };
-  function lerp(a: { x: number; y: number }, b: { x: number; y: number }, t: number) {
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-  }
-  // 9 upward triangles + 3 inverted (4 rows)
-  const tris: { pts: string; fill: string }[] = [];
-  const red = '#ff0000';
-  for (let row = 0; row < 3; row++) {
-    const t0 = row / 3, t1 = (row + 1) / 3;
-    for (let col = 0; col <= row * 2; col++) {
-      const isUp = col % 2 === 0;
-      const subCol = Math.floor(col / 2);
-      const tLeft0 = lerp(lerp(top, bl, t0), lerp(top, br, t0), subCol / (row || 1));
-      const tRight0 = lerp(lerp(top, bl, t0), lerp(top, br, t0), (subCol + 1) / (row || 1));
-      const bLeft1 = lerp(lerp(top, bl, t1), lerp(top, br, t1), subCol / (row + 1));
-      const bRight1 = lerp(lerp(top, bl, t1), lerp(top, br, t1), (subCol + 1) / (row + 1));
-      let pts: string;
-      if (isUp) {
-        const tl = row === 0 ? top : tLeft0;
-        const tr = row === 0 ? top : tRight0;
-        pts = `${tl.x},${tl.y} ${bLeft1.x},${bLeft1.y} ${bRight1.x},${bRight1.y}`;
-      } else {
-        pts = `${tLeft0.x},${tLeft0.y} ${tRight0.x},${tRight0.y} ${bRight1.x},${bRight1.y}`;
-      }
-      tris.push({ pts, fill: red });
-    }
-  }
-  return (
-    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      {tris.map((t, i) => (
-        <polygon key={i} points={t.pts} fill={t.fill} stroke="#1a1a1a" strokeWidth={s * 0.025} />
-      ))}
-    </svg>
-  );
-}
-
-function IconSkewb({ size = 64 }: { size?: number }) {
-  const s = size;
-  const pad = s * 0.06;
-  const w = s - pad * 2;
-  // Skewb face: 1 center diamond + 4 corner triangles
-  const cx = s / 2, cy = s / 2;
-  const half = w / 2;
-  // Corners: top, right, bottom, left
-  const corners = [
-    { pts: `${cx},${pad} ${cx - half},${cy} ${cx + half},${cy}` },           // top
-    { pts: `${s - pad},${cy} ${cx},${cy - half} ${cx},${cy + half}` },        // right
-    { pts: `${cx},${s - pad} ${cx - half},${cy} ${cx + half},${cy}` },        // bottom
-    { pts: `${pad},${cy} ${cx},${cy - half} ${cx},${cy + half}` },            // left
-  ];
-  const diamond = `${cx},${cy - half} ${cx + half},${cy} ${cx},${cy + half} ${cx - half},${cy}`;
-  return (
-    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      {corners.map((c, i) => (
-        <polygon key={i} points={c.pts} fill="#ff0000" stroke="#1a1a1a" strokeWidth={s * 0.03} />
-      ))}
-      <polygon points={diamond} fill="#ff0000" stroke="#1a1a1a" strokeWidth={s * 0.03} />
-    </svg>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Puzzle landing screen
 // ---------------------------------------------------------------------------
 
+function CubingIcon({ event, className }: { event: string; className?: string }) {
+  return <span className={clsx('cubing-icon', `event-${event}`, className)} />;
+}
+
 const PUZZLES = [
-  { id: '3x3', label: '3×3', Icon: Icon3x3, available: true },
-  { id: '2x2', label: '2×2', Icon: Icon2x2, available: false },
-  { id: 'sq1', label: 'Square-1', Icon: IconSq1, available: false },
-  { id: 'minx', label: 'Megaminx', Icon: IconMegaminx, available: false },
-  { id: 'pyram', label: 'Pyraminx', Icon: IconPyraminx, available: false },
-  { id: 'skewb', label: 'Skewb', Icon: IconSkewb, available: false },
+  { id: '3x3', label: '3×3', event: '333', available: true },
+  { id: '2x2', label: '2×2', event: '222', available: false },
+  { id: 'sq1', label: 'Square-1', event: 'sq1', available: false },
+  { id: 'minx', label: 'Megaminx', event: 'minx', available: false },
+  { id: 'pyram', label: 'Pyraminx', event: 'pyram', available: false },
+  { id: 'skewb', label: 'Skewb', event: 'skewb', available: false },
 ];
 
 function PuzzleLanding({ onSelect }: { onSelect: (id: string) => void }) {
@@ -204,7 +39,7 @@ function PuzzleLanding({ onSelect }: { onSelect: (id: string) => void }) {
                 : 'opacity-60 cursor-not-allowed',
             )}
           >
-            <p.Icon size={64} />
+            <CubingIcon event={p.event} className="text-[64px]" />
             <div>
               <div className="font-bold text-base">{p.label}</div>
               {!p.available && (
