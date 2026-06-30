@@ -26,12 +26,10 @@ export function invertAlg(alg: string): string {
       if (move.endsWith('2')) return move;
       return move + "'";
     })
-    .join(' ')
-    .replace(/(\s+[xyz]['2]?)+$/, '');
+    .join(' ');
 }
 
-
-function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number, puzzle = '3x3x3') {
+function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number, puzzle = '3x3x3', diagramSuffix = '') {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!alg) return;
   const el = document.createElement('twisty-player') as TwistyEl;
@@ -47,7 +45,7 @@ function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: numb
   el.puzzle = puzzle;
   el.visualization = 'PG3D';
   el.alg = '';
-  el.experimentalSetupAlg = 'x2 ' + invertAlg(alg);
+  el.experimentalSetupAlg = 'x2 ' + invertAlg(alg) + (diagramSuffix ? ' ' + diagramSuffix : '');
 }
 
 // OLL & COLL: top-down view — shows U-face orientation pattern + top-row side stickers.
@@ -77,16 +75,16 @@ export function F2LDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
 }
 
 // 2x2 top-down view (OLL / CLL / EG).
-export function TwoByTwoDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
+export function TwoByTwoDiagram({ alg, size = 80, diagramSuffix = '' }: { alg: string; size?: number; diagramSuffix?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2'); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramSuffix); }, [alg, size, diagramSuffix]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 // Auto-rotating 3D viewer for the case detail modal.
 // Slowly spins around the Y axis; dragging overrides rotation and snaps
 // latitude back to the default angle on release.
-export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3' }: { alg: string; size?: number; defaultLat?: number; puzzle?: string }) {
+export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3', diagramSuffix = '' }: { alg: string; size?: number; defaultLat?: number; puzzle?: string; diagramSuffix?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const elRef = useRef<TwistyEl | null>(null);
   const lon = useRef(25);
@@ -116,7 +114,7 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle =
     el.puzzle = puzzle;
     el.visualization = 'PG3D';
     el.alg = '';
-    el.experimentalSetupAlg = 'x2 ' + invertAlg(alg);
+    el.experimentalSetupAlg = 'x2 ' + invertAlg(alg) + (diagramSuffix ? ' ' + diagramSuffix : '');
 
     const autoRotate = () => {
       if (!dragging.current) {
