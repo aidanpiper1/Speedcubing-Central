@@ -10,10 +10,13 @@ export interface PllArrow { from: number; to: number; kind?: 'corner' | 'edge'; 
 
 type TwistyEl = HTMLElement & {
   experimentalSetupAlg: string;
+  experimentalStickeringMaskOrbits: unknown;
   alg: string;
   puzzle: string;
   visualization: string;
 };
+
+export type StickeringKind = 'oll' | 'pll' | 'f2l' | 'coll' | '2x2-oll' | 'full';
 
 export function invertAlg(alg: string): string {
   return alg
@@ -29,7 +32,76 @@ export function invertAlg(alg: string): string {
     .join(' ');
 }
 
-function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number, puzzle = '3x3x3', diagramPrefix = '') {
+// After x2 in experimentalSetupAlg, the cube is visually flipped:
+//   Visual TOP  (yellow face) = D-layer pieces: CORNERS/EDGES indices 4-7, CENTER 5
+//   Visual BOT  (white face)  = U-layer pieces: CORNERS/EDGES indices 0-3, CENTER 0
+//   Middle edges              = EDGES indices 8-11
+// Each piece has 5 facelet slots; facelet 0 is the primary (U/D face).
+const F = (a: string, b: string): { facelets: string[] } => ({ facelets: [a, b, b, b, b] });
+const REG  = F('regular', 'regular');  // all facelets shown
+const DIM  = F('dim',     'dim');      // all facelets dimmed
+const TOP  = F('regular', 'dim');      // primary (yellow) shown, sides dimmed
+
+function buildStickeringMask(kind: StickeringKind, puzzle: string): unknown {
+  if (kind === 'full' || kind === 'pll') return null;
+
+  if (puzzle === '3x3x3') {
+    if (kind === 'oll') {
+      // Bottom 2 layers: regular. Top layer: yellow sticker only.
+      return {
+        orbits: {
+          EDGES:   { pieces: [null, null, null, null, TOP,  TOP,  TOP,  TOP,  null, null, null, null] },
+          CORNERS: { pieces: [null, null, null, null, TOP,  TOP,  TOP,  TOP] },
+          CENTERS: { pieces: [null, null, null, null, null, null] },
+        },
+      };
+    }
+    if (kind === 'f2l') {
+      // F2L pieces + all centers (incl. yellow): regular. Top layer: dimmed.
+      return {
+        orbits: {
+          EDGES:   { pieces: [null, null, null, null, DIM,  DIM,  DIM,  DIM,  null, null, null, null] },
+          CORNERS: { pieces: [null, null, null, null, DIM,  DIM,  DIM,  DIM] },
+          CENTERS: { pieces: [null, null, null, null, null, null] },
+        },
+      };
+    }
+    if (kind === 'coll') {
+      // Everything regular except side stickers of visual-top edges (indices 4-7).
+      return {
+        orbits: {
+          EDGES:   { pieces: [null, null, null, null, TOP,  TOP,  TOP,  TOP,  null, null, null, null] },
+          CORNERS: { pieces: [null, null, null, null, REG,  REG,  REG,  REG] },
+          CENTERS: { pieces: [null, null, null, null, null, null] },
+        },
+      };
+    }
+  }
+
+  if (puzzle === '2x2x2') {
+    if (kind === '2x2-oll') {
+      // Bottom layer: regular. Top layer: yellow sticker only.
+      return {
+        orbits: {
+          CORNERS: { pieces: [null, null, null, null, TOP, TOP, TOP, TOP] },
+        },
+      };
+    }
+  }
+
+  return null;
+}
+
+function spawn3D(
+  container: HTMLDivElement,
+  alg: string,
+  size: number,
+  lat: number,
+  lon: number,
+  puzzle = '3x3x3',
+  diagramPrefix = '',
+  stickering: StickeringKind = 'full',
+) {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!alg) return;
   const el = document.createElement('twisty-player') as TwistyEl;
@@ -46,45 +118,41 @@ function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: numb
   el.visualization = 'PG3D';
   el.alg = '';
   el.experimentalSetupAlg = (diagramPrefix ? diagramPrefix + ' ' : '') + 'x2 ' + invertAlg(alg);
+  const mask = buildStickeringMask(stickering, puzzle);
+  if (mask) el.experimentalStickeringMaskOrbits = mask;
 }
 
-// OLL & COLL: top-down view — shows U-face orientation pattern + top-row side stickers.
 export function OllDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'oll'); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 export function PllDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'pll'); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 export function CollDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'coll'); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
-// F2L: front-right angled view to show the corner+edge slot.
 export function F2LDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 15, 35); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 15, 35, '3x3x3', '', 'f2l'); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
-// 2x2 top-down view (OLL / CLL / EG).
-export function TwoByTwoDiagram({ alg, size = 80, diagramPrefix = '' }: { alg: string; size?: number; diagramPrefix?: string }) {
+export function TwoByTwoDiagram({ alg, size = 80, diagramPrefix = '', stickering = 'full' as StickeringKind }: { alg: string; size?: number; diagramPrefix?: string; stickering?: StickeringKind }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramPrefix); }, [alg, size, diagramPrefix]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramPrefix, stickering); }, [alg, size, diagramPrefix, stickering]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
-// Auto-rotating 3D viewer for the case detail modal.
-// Slowly spins around the Y axis; dragging overrides rotation and snaps
-// latitude back to the default angle on release.
-export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3', diagramPrefix = '' }: { alg: string; size?: number; defaultLat?: number; puzzle?: string; diagramPrefix?: string }) {
+export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3', diagramPrefix = '', stickering = 'full' as StickeringKind }: { alg: string; size?: number; defaultLat?: number; puzzle?: string; diagramPrefix?: string; stickering?: StickeringKind }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const elRef = useRef<TwistyEl | null>(null);
   const lon = useRef(25);
@@ -115,6 +183,8 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle =
     el.visualization = 'PG3D';
     el.alg = '';
     el.experimentalSetupAlg = (diagramPrefix ? diagramPrefix + ' ' : '') + 'x2 ' + invertAlg(alg);
+    const mask = buildStickeringMask(stickering, puzzle);
+    if (mask) el.experimentalStickeringMaskOrbits = mask;
 
     const autoRotate = () => {
       if (!dragging.current) {
@@ -131,7 +201,7 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle =
       wrap.innerHTML = '';
       elRef.current = null;
     };
-  }, [alg, size]);
+  }, [alg, size, stickering]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     dragging.current = true;

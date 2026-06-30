@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import '@cubing/icons';
 import { PageHeader, Badge } from '../../components/ui';
-import { OllDiagram, PllDiagram, CollDiagram, F2LDiagram, TwoByTwoDiagram, RotatingCaseDiagram, invertAlg } from '../../components/CubeDiagram';
+import { OllDiagram, PllDiagram, CollDiagram, F2LDiagram, TwoByTwoDiagram, RotatingCaseDiagram, invertAlg, type StickeringKind } from '../../components/CubeDiagram';
 import { ALG_SETS, getSet, type AlgCase, type AlgSet } from '../../data/algSets';
 import { Icon } from '../../components/Icon';
 
@@ -168,12 +168,25 @@ function TwoByTwoPicker({ onSelect, onBack }: { onSelect: (setId: string) => voi
 // Case browser (unchanged logic, new breadcrumb nav)
 // ---------------------------------------------------------------------------
 
+function twoByTwoStickering(kind: AlgSet['kind']): StickeringKind {
+  return kind === '2x2-oll' ? '2x2-oll' : 'full';
+}
+
+function rotatingStickering(kind: AlgSet['kind']): StickeringKind {
+  if (kind === 'oll') return 'oll';
+  if (kind === 'pll') return 'pll';
+  if (kind === 'coll') return 'coll';
+  if (kind === 'f2l') return 'f2l';
+  if (kind === '2x2-oll') return '2x2-oll';
+  return 'full';
+}
+
 function CaseImage({ c, set, size = 80 }: { c: AlgCase; set: AlgSet; size?: number }) {
   if (set.kind === 'pll') return <PllDiagram alg={c.moves} size={size} />;
   if (set.kind === 'oll') return <OllDiagram alg={c.moves} size={size} />;
   if (set.kind === 'coll') return <CollDiagram alg={c.moves} size={size} />;
   if (['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind)) {
-    return <TwoByTwoDiagram alg={c.moves} size={size} diagramPrefix={c.diagramPrefix} />;
+    return <TwoByTwoDiagram alg={c.moves} size={size} diagramPrefix={c.diagramPrefix} stickering={twoByTwoStickering(set.kind)} />;
   }
   return <F2LDiagram alg={c.moves} size={size} />;
 }
@@ -261,6 +274,7 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
             defaultLat={set.kind === 'f2l' ? 15 : 30}
             puzzle={['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind) ? '2x2x2' : '3x3x3'}
             diagramPrefix={c.diagramPrefix}
+            stickering={rotatingStickering(set.kind)}
           />
         </div>
         <div>
