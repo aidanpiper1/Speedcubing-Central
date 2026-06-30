@@ -318,34 +318,28 @@ function CaseModal({
           <AlgChip alg={invertAlg(displayAlg)} />
         </div>
 
-        {/* Preferred alg selector */}
+        {/* Main algorithm — shows the current preferred (or default) */}
         <div>
-          <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-            {isAuthed ? 'Main Algorithm (click to set as preferred)' : 'Main Algorithm'}
-          </div>
-          <AlgChip
-            alg={c.moves}
-            selected={currentPref === null || currentPref === c.moves}
-            onClick={isAuthed ? () => onPrefChange({ preferredAlg: c.moves }) : undefined}
-          />
+          <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Main Algorithm</div>
+          <AlgChip alg={displayAlg} />
         </div>
 
+        {/* All algs except the current preferred, for switching */}
         {c.slotAlts && Object.keys(c.slotAlts).length > 0 ? (
           <div>
             <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Alternates by Slot</div>
             <SlotTabs slotAlts={c.slotAlts} />
           </div>
-        ) : c.alts && c.alts.length > 0 ? (
+        ) : allAlgs.filter((a) => a !== displayAlg).length > 0 ? (
           <div>
             <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-              Alternates ({c.alts.length}){isAuthed ? ' — click to set preferred' : ''}
+              Alternates{isAuthed ? ' — click to set as main' : ''}
             </div>
             <div className="flex flex-col gap-2">
-              {c.alts.map((a, i) => (
+              {allAlgs.filter((a) => a !== displayAlg).map((a, i) => (
                 <AlgChip
                   key={i}
                   alg={a}
-                  selected={currentPref === a}
                   onClick={isAuthed ? () => onPrefChange({ preferredAlg: a }) : undefined}
                 />
               ))}
@@ -614,9 +608,17 @@ function TrainingSession({
   // Pick a random case
   const [caseIndex, setCaseIndex] = useState(() => Math.floor(Math.random() * cases.length));
   const currentCase = cases[caseIndex];
-  const alg = effectiveAlg(currentCase, prefs[currentCase.id]);
-  const scramble = useMemo(() => invertAlg(alg), [alg]);
-  const moves = useMemo(() => parseMoves(alg), [alg]);
+  const preferredAlg = effectiveAlg(currentCase, prefs[currentCase.id]);
+
+  // Pick a random alg (main + alts) for the scramble each time the case changes.
+  const randomAlg = useMemo(() => {
+    const pool = [currentCase.moves, ...(currentCase.alts ?? [])];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, [currentCase]);
+
+  const scramble = useMemo(() => invertAlg(randomAlg), [randomAlg]);
+  // Solution shown move-by-move uses the preferred alg.
+  const moves = useMemo(() => parseMoves(preferredAlg), [preferredAlg]);
 
   const [revealed, setRevealed] = useState(0);
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'stopped'>('idle');
@@ -702,7 +704,7 @@ function TrainingSession({
           <div className="card p-4 flex flex-col items-center gap-3 w-full">
             <div className="text-sm font-semibold text-muted">Scramble</div>
             <RotatingCaseDiagram
-              alg={alg}
+              alg={randomAlg}
               size={260}
               defaultLat={30}
               puzzle={IS_2x2(set.kind) ? '2x2x2' : '3x3x3'}
