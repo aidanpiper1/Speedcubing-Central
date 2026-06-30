@@ -173,7 +173,7 @@ function CaseImage({ c, set, size = 80 }: { c: AlgCase; set: AlgSet; size?: numb
   if (set.kind === 'oll') return <OllDiagram alg={c.moves} size={size} />;
   if (set.kind === 'coll') return <CollDiagram alg={c.moves} size={size} />;
   if (['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind)) {
-    return <TwoByTwoDiagram alg={c.moves} size={size} diagramPrefix={c.diagramPrefix} stickering={set.kind === '2x2-oll' ? 'OLL' : 'full'} />;
+    return <TwoByTwoDiagram alg={c.moves} size={size} diagramPrefix={c.diagramPrefix} />;
   }
   return <F2LDiagram alg={c.moves} size={size} />;
 }
@@ -261,7 +261,6 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
             defaultLat={set.kind === 'f2l' ? 15 : 30}
             puzzle={['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind) ? '2x2x2' : '3x3x3'}
             diagramPrefix={c.diagramPrefix}
-            stickering={set.kind === '2x2-oll' ? 'OLL' : 'full'}
           />
         </div>
         <div>

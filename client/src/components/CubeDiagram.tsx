@@ -29,7 +29,7 @@ export function invertAlg(alg: string): string {
     .join(' ');
 }
 
-function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number, puzzle = '3x3x3', diagramPrefix = '', stickering = 'full') {
+function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: number, lon: number, puzzle = '3x3x3', diagramPrefix = '') {
   while (container.firstChild) container.removeChild(container.firstChild);
   if (!alg) return;
   const el = document.createElement('twisty-player') as TwistyEl;
@@ -41,7 +41,6 @@ function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: numb
   el.setAttribute('visualization', 'PG3D');
   el.setAttribute('camera-latitude', String(lat));
   el.setAttribute('camera-longitude', String(lon));
-  el.setAttribute('experimental-stickering', stickering);
   container.appendChild(el);
   el.puzzle = puzzle;
   el.visualization = 'PG3D';
@@ -52,40 +51,40 @@ function spawn3D(container: HTMLDivElement, alg: string, size: number, lat: numb
 // OLL & COLL: top-down view — shows U-face orientation pattern + top-row side stickers.
 export function OllDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'OLL'); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 export function PllDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'PLL'); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 export function CollDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'COLL'); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 // F2L: front-right angled view to show the corner+edge slot.
 export function F2LDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 15, 35, '3x3x3', '', 'full'); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 15, 35); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 // 2x2 top-down view (OLL / CLL / EG).
-export function TwoByTwoDiagram({ alg, size = 80, diagramPrefix = '', stickering = 'full' }: { alg: string; size?: number; diagramPrefix?: string; stickering?: string }) {
+export function TwoByTwoDiagram({ alg, size = 80, diagramPrefix = '' }: { alg: string; size?: number; diagramPrefix?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramPrefix, stickering); }, [alg, size, diagramPrefix, stickering]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramPrefix); }, [alg, size, diagramPrefix]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
 // Auto-rotating 3D viewer for the case detail modal.
 // Slowly spins around the Y axis; dragging overrides rotation and snaps
 // latitude back to the default angle on release.
-export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3', diagramPrefix = '', stickering = 'full' }: { alg: string; size?: number; defaultLat?: number; puzzle?: string; diagramPrefix?: string; stickering?: string }) {
+export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle = '3x3x3', diagramPrefix = '' }: { alg: string; size?: number; defaultLat?: number; puzzle?: string; diagramPrefix?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const elRef = useRef<TwistyEl | null>(null);
   const lon = useRef(25);
@@ -110,7 +109,6 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle =
     el.setAttribute('visualization', 'PG3D');
     el.setAttribute('camera-latitude', String(lat.current));
     el.setAttribute('camera-longitude', String(lon.current));
-    el.setAttribute('experimental-stickering', stickering);
     wrap.appendChild(el);
     elRef.current = el;
     el.puzzle = puzzle;
@@ -133,7 +131,7 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle =
       wrap.innerHTML = '';
       elRef.current = null;
     };
-  }, [alg, size, stickering]);
+  }, [alg, size]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     dragging.current = true;
