@@ -163,6 +163,37 @@ function AlgChip({ alg }: { alg: string }) {
   );
 }
 
+function SlotTabs({ slotAlts }: { slotAlts: Record<string, string[]> }) {
+  const slots = Object.keys(slotAlts);
+  const [active, setActive] = useState(slots[0] ?? '');
+  const algs = slotAlts[active] ?? [];
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1 mb-3">
+        {slots.map((s) => (
+          <button
+            key={s}
+            onClick={() => setActive(s)}
+            className={clsx(
+              'px-2.5 py-1 rounded text-xs font-semibold transition-colors',
+              active === s ? 'bg-accent text-white' : 'bg-card-hover text-muted hover:text-primary',
+            )}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      {algs.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {algs.map((a, i) => <AlgChip key={i} alg={a} />)}
+        </div>
+      ) : (
+        <p className="text-sm text-muted italic">No algorithms on file.</p>
+      )}
+    </div>
+  );
+}
+
 function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () => void }) {
   const setup = invertAlg(c.moves);
   return (
@@ -187,15 +218,25 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
           <AlgChip alg={c.moves} />
         </div>
         <div>
-          <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-            Alternates {c.alts?.length ? `(${c.alts.length})` : ''}
-          </div>
-          {c.alts && c.alts.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {c.alts.map((a, i) => <AlgChip key={i} alg={a} />)}
-            </div>
+          {c.slotAlts && Object.keys(c.slotAlts).length > 0 ? (
+            <>
+              <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Alternates by Slot</div>
+              <SlotTabs slotAlts={c.slotAlts} />
+            </>
+          ) : c.alts && c.alts.length > 0 ? (
+            <>
+              <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                Alternates ({c.alts.length})
+              </div>
+              <div className="flex flex-col gap-2">
+                {c.alts.map((a, i) => <AlgChip key={i} alg={a} />)}
+              </div>
+            </>
           ) : (
-            <p className="text-sm text-muted italic">No alternates on file.</p>
+            <>
+              <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Alternates</div>
+              <p className="text-sm text-muted italic">No alternates on file.</p>
+            </>
           )}
         </div>
       </div>
