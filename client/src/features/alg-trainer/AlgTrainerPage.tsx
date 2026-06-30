@@ -208,7 +208,7 @@ function CaseCard({ c, set, onSelect }: { c: AlgCase; set: AlgSet; onSelect: (c:
       <div className="shrink-0"><CaseImage c={c} set={set} size={80} /></div>
       <div className="min-w-0">
         <div className="font-semibold text-sm flex items-center gap-2">
-          {c.name} <Badge color="gray">{c.probability}</Badge>
+          {c.name}
         </div>
         <div className="font-mono text-xs text-muted mt-1 break-words">{c.moves}</div>
       </div>
@@ -263,7 +263,7 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold">{c.name}</h2>
-            <span className="text-sm text-muted">{c.group} · {c.probability}</span>
+            <span className="text-sm text-muted">{c.group}</span>
           </div>
           <button onClick={onClose} className="btn-ghost text-lg leading-none px-2 py-1">✕</button>
         </div>

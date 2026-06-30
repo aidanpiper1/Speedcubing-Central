@@ -11,7 +11,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'Sune',
       group: '',
       moves: "R U R' U R U2 R'",
-      probability: '—',
       alts: ["R U R2 U' R2 U R", "R U' L' U R' U' L", "y' R' U2 R U R' U R"],
     },
     {
@@ -19,7 +18,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'Anti Sune',
       group: '',
       moves: "R U2 R' U' R U' R'",
-      probability: '—',
       alts: ["y L' U' L U' L' U2 L", "y' R' U' R U' R' U2 R", "R' F R F' R U R'"],
     },
     {
@@ -27,7 +25,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'Pi',
       group: '',
       moves: "F R U R' U' R U R' U' F'",
-      probability: '—',
       alts: ["R U' R2 U R2 U R2 U' R", "R U2 R2 U' R2 U' R2 U2 R", "y' R' F R2 U' R2 F R"],
     },
     {
@@ -35,7 +32,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'P',
       group: '',
       moves: "F R U R' U' F'",
-      probability: '—',
       alts: ["y2 F U R U' R' F'", "y' R2 D R' U2 R D' R' U2 R'", "y R2 D' R U2 R' D R U2 R"],
     },
     {
@@ -43,7 +39,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'L',
       group: '',
       moves: "y F' R U R' U' R' F R",
-      probability: '—',
       alts: ["F R U' R' U' R U R' F'", "F R' F' R U R U' R'", "F' R U R' U' R' F R"],
     },
     {
@@ -51,7 +46,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'T',
       group: '',
       moves: "R U R' U' R' F R F'",
-      probability: '—',
       alts: ["R U2 R U2 R2", "U R U R' U' F' U' F", "y2 x U' L' U R' U' L U R"],
     },
     {
@@ -59,7 +53,6 @@ export const ORTEGA_OLL_SET: AlgSet = {
       name: 'H',
       group: '',
       moves: "R2 U2 R' U2 R2",
-      probability: '—',
       alts: ["R2 U2 R U2 R2", "y R U R' U R U' R' U R U2 R'", "F R U R' U' R U R' U' R U R' U' F'"],
     },
   ],

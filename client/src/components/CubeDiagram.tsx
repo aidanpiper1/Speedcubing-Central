@@ -57,7 +57,7 @@ function buildStickeringMask(kind: StickeringKind, puzzle: string): unknown {
       };
     }
     if (kind === 'f2l') {
-      // F2L pieces + all centers (incl. yellow): regular. Top layer: dimmed.
+      // F2L pieces + side centers: regular. Top layer + yellow center: dimmed.
       return {
         orbits: {
           EDGES:   { pieces: [null, null, null, null, DIM,  DIM,  DIM,  DIM,  null, null, null, null] },

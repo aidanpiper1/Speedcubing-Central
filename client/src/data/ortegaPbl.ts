@@ -11,7 +11,6 @@ export const ORTEGA_PBL_SET: AlgSet = {
       name: 'Adj',
       group: '',
       moves: "y R U R' F' R U R' U' R' F R2 U' R'",
-      probability: '—',
       alts: ["y R' F R F' R U2 R' U R U2 R'", "y R U R' U' R' F R2 U' R' U' R U R' F'", "y2 R' F R' F2 R U' R' F2 R2"],
     },
     {
@@ -19,7 +18,6 @@ export const ORTEGA_PBL_SET: AlgSet = {
       name: 'Opp',
       group: '',
       moves: "R U' R' U' F2 U' R U R' U F2",
-      probability: '—',
       alts: ["F R U' R' U' R U R' F' R U R' U' R' F R F'", "R U' R' U' F2 U' R U R' D R2", "z2 R U' R' U' F2 U' R U R' U R2 B2"],
     },
     {
@@ -27,7 +25,6 @@ export const ORTEGA_PBL_SET: AlgSet = {
       name: 'Opp Opp',
       group: '',
       moves: "R2 F2 R2",
-      probability: '—',
       alts: ["R2 B2 R2", "x R2 U2 R2", "x' R2 U2 R2"],
     },
     {
@@ -35,7 +32,6 @@ export const ORTEGA_PBL_SET: AlgSet = {
       name: 'Adj Adj',
       group: '',
       moves: "R2 U' B2 U2 R2 U' R2",
-      probability: '—',
       alts: ["y2 R2 U' R2 U2 F2 U' R2", "R2 U R2 U2 F2 U F2", "R2 U' F2 U2 R2 U' B2"],
     },
     {
@@ -43,7 +39,6 @@ export const ORTEGA_PBL_SET: AlgSet = {
       name: 'Adj Opp',
       group: '',
       moves: "R U' R F2 R' U R'",
-      probability: '—',
       alts: ["R' F R' F2 R U' R", "y2 R' U R' F2 R F' R", "y2 R' U L' U2 R U' L"],
     },
     {
@@ -51,7 +46,6 @@ export const ORTEGA_PBL_SET: AlgSet = {
       name: 'Opp Adj',
       group: '',
       moves: "y R2 U R2 U' R2 U R2 U' R2",
-      probability: '—',
       alts: ["R' D R' F2 R D' R", "z2 R U' R F2 R' U R'", "y R2 U' R2 U R2 U' R2 U R2"],
     },
   ],

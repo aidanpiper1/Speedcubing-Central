@@ -5,7 +5,6 @@ const f = (id: string, name: string, group: string, moves: string): AlgCase => (
   name,
   group,
   moves,
-  probability: '1/41',
 });
 
 const f2lCases: AlgCase[] = [

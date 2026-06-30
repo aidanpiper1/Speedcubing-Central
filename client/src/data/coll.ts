@@ -6,7 +6,6 @@ const co = (id: string, name: string, group: string, moves: string): AlgCase => 
   name,
   group,
   moves,
-  probability: '1/40',
   oll: ollPattern(fullCross, '101', '101', '101', '101'),
 });
 
