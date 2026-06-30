@@ -261,12 +261,7 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
             defaultLat={set.kind === 'f2l' ? 15 : 30}
             puzzle={['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind) ? '2x2x2' : '3x3x3'}
             diagramPrefix={c.diagramPrefix}
-            stickering={
-              set.kind === 'oll' || set.kind === '2x2-oll' ? 'OLL' :
-              set.kind === 'pll' ? 'PLL' :
-              set.kind === 'coll' ? 'COLL' :
-              'full'
-            }
+            stickering={set.kind === '2x2-oll' ? 'OLL' : 'full'}
           />
         </div>
         <div>
