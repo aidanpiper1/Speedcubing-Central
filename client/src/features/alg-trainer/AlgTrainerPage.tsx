@@ -127,8 +127,8 @@ const TWO_BY_TWO_SET_CARDS = [
   { id: 'OrtegaOLL', label: 'OLL', description: 'Ortega OLL', count: 7 },
   { id: 'OrtegaPBL', label: 'PBL', description: 'Ortega PBL', count: 6 },
   { id: 'CLL', label: 'CLL', description: 'Corners of the Last Layer', count: 42 },
-  { id: 'EG1', label: 'EG1', description: 'EG-1 (one solved bottom corner)', count: 42 },
-  { id: 'EG2', label: 'EG2', description: 'EG-2 (two solved bottom corners)', count: 42 },
+  { id: 'EG1', label: 'EG-1', description: 'EG-1 (one solved bottom corner)', count: 42 },
+  { id: 'EG2', label: 'EG-2', description: 'EG-2 (two solved bottom corners)', count: 42 },
 ];
 
 function TwoByTwoPicker({ onSelect, onBack }: { onSelect: (setId: string) => void; onBack: () => void }) {
