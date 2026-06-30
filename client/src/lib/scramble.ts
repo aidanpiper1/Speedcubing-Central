@@ -31,12 +31,12 @@ export function generateScramble(eventId: string): string {
 
 // Fetch a WCA-quality random-state scramble from the server (cubing.js runs
 // server-side via Node.js worker_threads, avoiding browser Web Worker issues).
-export async function getScramble(eventId: string): Promise<{ scramble: string; randomState: boolean }> {
+export async function getScramble(eventId: string): Promise<string> {
   try {
-    const { data } = await api.get<{ scramble: string; randomState: boolean }>(`/scramble/${eventId}`);
-    if (data.scramble) return { scramble: data.scramble, randomState: data.randomState ?? true };
+    const { data } = await api.get<{ scramble: string }>(`/scramble/${eventId}`);
+    if (data.scramble) return data.scramble;
   } catch (e) {
     console.warn('Server scramble failed, falling back:', e);
   }
-  return { scramble: generateScramble(eventId), randomState: false };
+  return generateScramble(eventId);
 }

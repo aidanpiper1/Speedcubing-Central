@@ -10,8 +10,8 @@ router.get('/:eventId', async (req, res) => {
     res.status(400).json({ error: 'Unknown event' });
     return;
   }
-  const result = await getScramble(eventId);
-  res.json(result);
+  const scramble = await getScramble(eventId);
+  res.json({ scramble });
 });
 
 export default router;

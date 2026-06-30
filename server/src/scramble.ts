@@ -4,7 +4,12 @@ import { getEvent, normalizeScramble } from '@scc/shared';
 // scrambow is CommonJS; grab the Scrambow class via interop default.
 const { Scrambow } = pkg as unknown as { Scrambow: typeof import('scrambow').Scrambow };
 
-// Fast synchronous fallback (random-move) used if random-state generation fails.
+// Events where scrambow produces the correct WCA-format output and cubing.js
+// does not: 2x2 WCA scrambles use only R/U/F moves (DLB corner fixed), but
+// cubing.js generates valid random-state scrambles using all 6 faces.
+const SCRAMBOW_PREFERRED = new Set(['222']);
+
+// Synchronous scrambow scramble — random-state for 222, random-move fallback otherwise.
 export function generateScramble(eventId: string): string {
   const ev = getEvent(eventId);
   const type = ev?.scrambowType;
@@ -18,8 +23,11 @@ export function generateScramble(eventId: string): string {
   }
 }
 
-// WCA-quality random-state scramble via cubing.js; synchronous scrambow fallback.
-export async function getScramble(eventId: string): Promise<{ scramble: string; randomState: boolean }> {
+// WCA-quality random-state scramble via cubing.js; scrambow fallback.
+export async function getScramble(eventId: string): Promise<string> {
+  if (SCRAMBOW_PREFERRED.has(eventId)) {
+    return generateScramble(eventId);
+  }
   try {
     const timeoutMs = 15_000;
     const { randomScrambleForEvent } = await import('cubing/scramble');
@@ -29,9 +37,9 @@ export async function getScramble(eventId: string): Promise<{ scramble: string; 
         setTimeout(() => reject(new Error('cubing.js timeout')), timeoutMs),
       ),
     ]);
-    return { scramble: normalizeScramble(alg.toString()), randomState: true };
+    return normalizeScramble(alg.toString());
   } catch (e) {
-    console.warn('[scramble] cubing.js failed, falling back to random-move:', e instanceof Error ? e.message : e);
+    console.warn('[scramble] cubing.js failed, falling back:', e instanceof Error ? e.message : e);
   }
-  return { scramble: generateScramble(eventId), randomState: false };
+  return generateScramble(eventId);
 }

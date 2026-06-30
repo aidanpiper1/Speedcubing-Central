@@ -67,7 +67,7 @@ export function attachSocket(server: HttpServer): IOServer {
   }
 
   async function startRound(roomId: string, code: string, eventId: string, currentRoundNumber: number) {
-    const { scramble } = await getScramble(eventId);
+    const scramble = await getScramble(eventId);
     const roundNumber = currentRoundNumber + 1;
     await prisma.battleRoom.update({
       where: { id: roomId },

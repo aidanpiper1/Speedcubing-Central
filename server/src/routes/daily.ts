@@ -25,7 +25,7 @@ async function getOrCreateDaily(eventId: string) {
   if (existing) return existing;
   // Determinism comes from persistence: the first request generates and stores
   // the scramble; everyone that day reads the stored one.
-  const { scramble } = await getScramble(eventId);
+  const scramble = await getScramble(eventId);
   // Use upsert to avoid race conditions creating duplicates.
   return prisma.dailyScramble.upsert({
     where: { date_eventId: { date, eventId } },

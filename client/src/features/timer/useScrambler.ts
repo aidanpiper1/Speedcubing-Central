@@ -5,9 +5,8 @@ import { getScramble } from '../../lib/scramble';
 // slow random-state events (4x4+) is hidden while the user is solving.
 export function useScrambler(eventId: string) {
   const [scramble, setScramble] = useState('');
-  const [randomState, setRandomState] = useState(true);
   const [loading, setLoading] = useState(true);
-  const nextRef = useRef<Promise<{ scramble: string; randomState: boolean }> | null>(null);
+  const nextRef = useRef<Promise<string> | null>(null);
   const reqId = useRef(0);
 
   const prefetch = useCallback(() => {
@@ -18,10 +17,9 @@ export function useScrambler(eventId: string) {
   const refresh = useCallback(async () => {
     const id = ++reqId.current;
     setLoading(true);
-    const result = await getScramble(eventId);
+    const s = await getScramble(eventId);
     if (id === reqId.current) {
-      setScramble(result.scramble);
-      setRandomState(result.randomState);
+      setScramble(s);
       setLoading(false);
       prefetch();
     }
@@ -32,10 +30,9 @@ export function useScrambler(eventId: string) {
     const id = ++reqId.current;
     const pending = nextRef.current ?? getScramble(eventId);
     setLoading(true);
-    const result = await pending;
+    const s = await pending;
     if (id === reqId.current) {
-      setScramble(result.scramble);
-      setRandomState(result.randomState);
+      setScramble(s);
       setLoading(false);
       prefetch();
     }
@@ -47,5 +44,5 @@ export function useScrambler(eventId: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  return { scramble, randomState, loading, refresh, advance };
+  return { scramble, loading, refresh, advance };
 }

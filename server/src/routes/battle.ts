@@ -37,7 +37,7 @@ router.post('/', optionalAuth, async (req, res, next) => {
       if (!exists) break;
       code = makeCode();
     }
-    const { scramble } = await getScramble(eventId);
+    const scramble = await getScramble(eventId);
     const room = await prisma.battleRoom.create({
       data: { name, code, eventId, isPublic, password: hashedPassword, scramble },
     });

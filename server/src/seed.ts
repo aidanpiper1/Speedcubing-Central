@@ -35,7 +35,7 @@ async function main() {
     await prisma.dailyScramble.upsert({
       where: { date_eventId: { date: dateObj, eventId } },
       update: {},
-      create: { date: dateObj, eventId, scramble: (await getScramble(eventId)).scramble },
+      create: { date: dateObj, eventId, scramble: await getScramble(eventId) },
     });
   }
   console.log(`  Daily scrambles seeded for ${today}.`);
