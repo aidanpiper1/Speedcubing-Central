@@ -142,7 +142,7 @@ export function CollDiagram({ alg, size = 80 }: { alg: string; size?: number }) 
 
 export function F2LDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 15, 35, '3x3x3', '', 'f2l'); }, [alg, size]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '3x3x3', '', 'f2l'); }, [alg, size]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 

@@ -271,7 +271,7 @@ function CaseModal({ c, set, onClose }: { c: AlgCase; set: AlgSet; onClose: () =
           <RotatingCaseDiagram
             alg={c.moves}
             size={280}
-            defaultLat={set.kind === 'f2l' ? 15 : 30}
+            defaultLat={30}
             puzzle={['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind) ? '2x2x2' : '3x3x3'}
             diagramPrefix={c.diagramPrefix}
             stickering={rotatingStickering(set.kind)}
