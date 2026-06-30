@@ -77,7 +77,7 @@ export function F2LDiagram({ alg, size = 80 }: { alg: string; size?: number }) {
 // 2x2 top-down view (OLL / CLL / EG).
 export function TwoByTwoDiagram({ alg, size = 80, diagramPrefix = '' }: { alg: string; size?: number; diagramPrefix?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramSuffix); }, [alg, size, diagramSuffix]);
+  useEffect(() => { if (ref.current) spawn3D(ref.current, alg, size, 72, 25, '2x2x2', diagramPrefix); }, [alg, size, diagramPrefix]);
   return <div ref={ref} style={{ width: size, height: size }} />;
 }
 
