@@ -16,7 +16,7 @@ function CubingIcon({ event, className }: { event: string; className?: string })
 
 const PUZZLES = [
   { id: '3x3', label: '3×3', event: '333', available: true },
-  { id: '2x2', label: '2×2', event: '222', available: false },
+  { id: '2x2', label: '2×2', event: '222', available: true },
   { id: 'sq1', label: 'Square-1', event: 'sq1', available: false },
   { id: 'minx', label: 'Megaminx', event: 'minx', available: false },
   { id: 'pyram', label: 'Pyraminx', event: 'pyram', available: false },
@@ -120,6 +120,51 @@ function ThreeByThreePicker({ onSelect, onBack }: { onSelect: (setId: string) =>
 }
 
 // ---------------------------------------------------------------------------
+// 2×2 set picker
+// ---------------------------------------------------------------------------
+
+const TWO_BY_TWO_SET_CARDS = [
+  { id: 'OrtegaOLL', label: 'OLL', description: 'Ortega OLL', count: 7 },
+  { id: 'OrtegaPBL', label: 'PBL', description: 'Ortega PBL', count: 6 },
+  { id: 'CLL', label: 'CLL', description: 'Corners of the Last Layer', count: 42 },
+  { id: 'EG1', label: 'EG1', description: 'EG-1 (one solved bottom corner)', count: 42 },
+  { id: 'EG2', label: 'EG2', description: 'EG-2 (two solved bottom corners)', count: 42 },
+];
+
+function TwoByTwoPicker({ onSelect, onBack }: { onSelect: (setId: string) => void; onBack: () => void }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="btn-ghost flex items-center gap-1 text-sm">
+          <Icon name="arrowLeft" size={14} /> Puzzles
+        </button>
+        <span className="text-muted">/</span>
+        <span className="font-semibold">2×2</span>
+      </div>
+      <PageHeader title="2×2 Algorithm Sets" subtitle="Choose a set to browse and learn." />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {TWO_BY_TWO_SET_CARDS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onSelect(s.id)}
+            className="card p-6 flex flex-col items-center gap-4 hover:border-accent/50 transition-colors cursor-pointer text-center"
+          >
+            <div className="w-20 h-20 flex items-center justify-center">
+              <CubingIcon event="222" className="text-[48px]" />
+            </div>
+            <div>
+              <div className="font-bold text-lg">{s.label}</div>
+              <div className="text-xs text-muted mt-0.5">{s.description}</div>
+              <div className="text-xs text-accent font-semibold mt-1">{s.count} cases</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Case browser (unchanged logic, new breadcrumb nav)
 // ---------------------------------------------------------------------------
 
@@ -127,6 +172,9 @@ function CaseImage({ c, set, size = 80 }: { c: AlgCase; set: AlgSet; size?: numb
   if (set.kind === 'pll') return <PllDiagram alg={c.moves} size={size} />;
   if (set.kind === 'oll') return <OllDiagram alg={c.moves} size={size} />;
   if (set.kind === 'coll') return <CollDiagram alg={c.moves} size={size} />;
+  if (['2x2-oll', '2x2-pbl', 'cll', 'eg1', 'eg2'].includes(set.kind)) {
+    return <CubingIcon event="222" className="text-[64px]" />;
+  }
   return <F2LDiagram alg={c.moves} size={size} />;
 }
 
@@ -310,7 +358,7 @@ export default function AlgTrainerPage() {
     );
   }
 
-  if (view.screen === 'sets') {
+  if (view.screen === 'sets' && view.puzzle === '3x3') {
     return (
       <ThreeByThreePicker
         onBack={() => setView({ screen: 'puzzles' })}
@@ -319,10 +367,21 @@ export default function AlgTrainerPage() {
     );
   }
 
+  if (view.screen === 'sets' && view.puzzle === '2x2') {
+    return (
+      <TwoByTwoPicker
+        onBack={() => setView({ screen: 'puzzles' })}
+        onSelect={(setId) => setView({ screen: 'cases', puzzle: view.puzzle, setId })}
+      />
+    );
+  }
+
+  // At this point view.screen must be 'cases'
+  const casesView = view as { screen: 'cases'; puzzle: string; setId: string };
   return (
     <CaseBrowser
-      setId={view.setId}
-      onBack={() => setView({ screen: 'sets', puzzle: view.puzzle })}
+      setId={casesView.setId}
+      onBack={() => setView({ screen: 'sets', puzzle: casesView.puzzle })}
     />
   );
 }
