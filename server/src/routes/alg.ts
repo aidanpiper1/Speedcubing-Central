@@ -77,4 +77,41 @@ router.post('/review', async (req, res, next) => {
   }
 });
 
+// GET /api/alg/prefs/:setId — all prefs for the current user in a set
+router.get('/prefs/:setId', async (req, res, next) => {
+  try {
+    const rows = await prisma.userAlgPref.findMany({
+      where: { userId: req.user!.sub, setId: req.params.setId },
+    });
+    res.json(rows.map((r) => ({ caseId: r.caseId, status: r.status, preferredAlg: r.preferredAlg })));
+  } catch (e) {
+    next(e);
+  }
+});
+
+const prefSchema = z.object({
+  setId: z.string(),
+  caseId: z.string(),
+  status: z.enum(['NEW', 'LEARNING', 'LEARNED']).optional(),
+  preferredAlg: z.string().nullable().optional(),
+});
+
+// PUT /api/alg/pref — upsert a single case preference
+router.put('/pref', async (req, res, next) => {
+  try {
+    const { setId, caseId, status, preferredAlg } = prefSchema.parse(req.body);
+    const data: Record<string, unknown> = {};
+    if (status !== undefined) data.status = status;
+    if (preferredAlg !== undefined) data.preferredAlg = preferredAlg;
+    const saved = await prisma.userAlgPref.upsert({
+      where: { userId_setId_caseId: { userId: req.user!.sub, setId, caseId } },
+      update: data,
+      create: { userId: req.user!.sub, setId, caseId, ...data },
+    });
+    res.json({ caseId: saved.caseId, status: saved.status, preferredAlg: saved.preferredAlg });
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;

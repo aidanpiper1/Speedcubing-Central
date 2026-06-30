@@ -43,6 +43,7 @@ model User {
   battleParts   BattleParticipant[]
   letterPairs   LetterPair[]
   algProgress   AlgProgress[]
+  algPrefs      UserAlgPref[]
 
   @@index([wcaId])
 }
@@ -152,6 +153,27 @@ model LetterPair {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, pair])
+}
+
+enum AlgStatus {
+  NEW
+  LEARNING
+  LEARNED
+}
+
+// Per-user algorithm preferences: custom main alg + learning status
+model UserAlgPref {
+  id           String    @id @default(cuid())
+  userId       String
+  setId        String
+  caseId       String
+  status       AlgStatus @default(NEW)
+  preferredAlg String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, setId, caseId])
+  @@index([userId, setId])
 }
 
 // Spaced repetition progress for algorithm trainer (SM-2)
