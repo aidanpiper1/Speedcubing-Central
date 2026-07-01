@@ -155,11 +155,16 @@ const SET_CARDS_3x3 = [
 ];
 
 const SET_CARDS_2x2 = [
-  { id: 'OrtegaOLL', label: 'OLL', description: 'Ortega OLL', count: 7 },
-  { id: 'OrtegaPBL', label: 'PBL', description: 'Ortega PBL', count: 6 },
-  { id: 'CLL',       label: 'CLL', description: 'Corners of the Last Layer', count: 42 },
-  { id: 'EG1',       label: 'EG-1', description: 'EG-1 (one solved bottom corner)', count: 42 },
-  { id: 'EG2',       label: 'EG-2', description: 'EG-2 (two solved bottom corners)', count: 42 },
+  { id: 'OrtegaOLL', label: 'OLL', description: 'Ortega OLL', count: 7,
+    preview: <TwoByTwoDiagram alg="R U R' U R U2 R'" size={80} stickering="2x2-oll" /> },
+  { id: 'OrtegaPBL', label: 'PBL', description: 'Ortega PBL', count: 6,
+    preview: <TwoByTwoDiagram alg="y R U R' F' R U R' U' R' F R2 U' R'" size={80} /> },
+  { id: 'CLL',       label: 'CLL', description: 'Corners of the Last Layer', count: 42,
+    preview: <TwoByTwoDiagram alg="y R U2 R' U' R U' R'" size={80} /> },
+  { id: 'EG1',       label: 'EG-1', description: 'EG-1 (one solved bottom corner)', count: 42,
+    preview: <TwoByTwoDiagram alg="U R U' R' F' U' F2 R U' R'" size={80} /> },
+  { id: 'EG2',       label: 'EG-2', description: 'EG-2 (two solved bottom corners)', count: 42,
+    preview: <TwoByTwoDiagram alg="F R2 U R' U2 R U R2 U F'" size={80} /> },
 ];
 
 function SetPicker({ puzzle, onSelect, onBack }: { puzzle: string; onSelect: (id: string) => void; onBack: () => void }) {
@@ -194,9 +199,7 @@ function SetPicker({ puzzle, onSelect, onBack }: { puzzle: string; onSelect: (id
           {SET_CARDS_2x2.map((s) => (
             <button key={s.id} onClick={() => onSelect(s.id)}
               className="card p-6 flex flex-col items-center gap-4 hover:border-accent/50 transition-colors cursor-pointer text-center">
-              <div className="w-20 h-20 flex items-center justify-center">
-                <CubingIcon event="222" className="text-[48px]" />
-              </div>
+              <div className="w-20 h-20 flex items-center justify-center">{s.preview}</div>
               <div>
                 <div className="font-bold text-lg">{s.label}</div>
                 <div className="text-xs text-muted mt-0.5">{s.description}</div>
