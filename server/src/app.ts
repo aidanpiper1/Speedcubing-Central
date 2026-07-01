@@ -21,6 +21,7 @@ import battleRouter from './routes/battle.js';
 import bldRouter from './routes/bld.js';
 import algRouter from './routes/alg.js';
 import scrambleRouter from './routes/scramble.js';
+import reconstructionsRouter from './routes/reconstructions.js';
 
 export function createApp() {
   const app = express();
@@ -73,6 +74,7 @@ export function createApp() {
   app.use('/api/bld', bldRouter);
   app.use('/api/alg', algRouter);
   app.use('/api/scramble', scrambleRouter);
+  app.use('/api/reconstructions', reconstructionsRouter);
 
   // 404 for unknown API routes
   app.use('/api', (_req, res) => {

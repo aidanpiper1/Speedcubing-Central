@@ -1,13 +1,7 @@
 import { formatTime, normalizeScramble, getEvent, type SolveDTO } from '@scc/shared';
-import { toast } from '../../store/toast';
 import type { SolveAverage } from './stats';
 
-export function copyText(text: string, label = 'Copied to clipboard') {
-  navigator.clipboard?.writeText(text).then(
-    () => toast.success(label),
-    () => toast.error('Copy failed'),
-  );
-}
+export { copyText } from '../../lib/clipboard';
 
 // Single solve: "12.34   R U R' U' ..." (scramble spacing normalized).
 export function formatSolveCopy(solve: SolveDTO, precision: number): string {

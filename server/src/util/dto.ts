@@ -1,5 +1,5 @@
-import type { User, Solve, Session } from '@prisma/client';
-import type { PublicUser, SolveDTO, SessionDTO } from '@scc/shared';
+import type { User, Solve, Session, Reconstruction } from '@prisma/client';
+import type { PublicUser, SolveDTO, SessionDTO, ReconstructionDTO } from '@scc/shared';
 
 export function toPublicUser(u: User): PublicUser {
   return {
@@ -34,5 +34,17 @@ export function toSessionDTO(s: Session & { _count?: { solves: number } }): Sess
     name: s.name,
     createdAt: s.createdAt.toISOString(),
     solveCount: s._count?.solves,
+  };
+}
+
+export function toReconstructionDTO(r: Reconstruction): ReconstructionDTO {
+  return {
+    id: r.id,
+    userId: r.userId,
+    title: r.title,
+    eventId: r.eventId,
+    scramble: r.scramble,
+    solution: r.solution,
+    createdAt: r.createdAt.toISOString(),
   };
 }

@@ -18,6 +18,7 @@ const NAV: NavItem[] = [
   { to: '/calculator', label: 'Calculator', icon: 'calculator' },
   { to: '/alg-trainer', label: 'Algorithms', icon: 'cube' },
   { to: '/battle', label: 'Battle', icon: 'swords' },
+  { to: '/reconstruction', label: 'Reconstruction', icon: 'film' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 

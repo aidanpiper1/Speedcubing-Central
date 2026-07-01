@@ -93,6 +93,16 @@ export interface DailyScrambleDTO {
   scramble: string;
 }
 
+export interface ReconstructionDTO {
+  id: string;
+  userId: string;
+  title: string;
+  eventId: string;
+  scramble: string;
+  solution: string;
+  createdAt: string;
+}
+
 export interface DailyLeaderboardEntry {
   rank: number;
   userId: string;

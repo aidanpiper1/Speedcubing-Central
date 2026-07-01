@@ -1,7 +1,7 @@
 // Last-layer and F2L case diagrams using cubing.js twisty-player.
 // Each component takes the algorithm that SOLVES the case; we display the
 // inverse (the unsolved state). OLL/PLL/COLL use 2D flat view; F2L uses 3D.
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import 'cubing/twisty';
 
 // Legacy types kept so existing data files compile without changes.
@@ -251,3 +251,292 @@ export function RotatingCaseDiagram({ alg, size = 280, defaultLat = 30, puzzle =
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Full scramble + solution playback (Reconstruction tab)
+// ---------------------------------------------------------------------------
+
+// Minimal shape of cubing.js's AlgIndexer that we rely on for scrubbing —
+// see node_modules/cubing/dist/lib/cubing/PuzzleLoader-*.d.ts (`AlgIndexer`).
+// Index/timestamp values are plain numbers at runtime (TS-branded upstream).
+interface AlgIndexerLike {
+  numAnimatedLeaves(): number;
+  algDuration(): number;
+  indexToMoveStartTimestamp(index: number): number;
+  timestampToIndex(timestamp: number): number;
+}
+
+// timestampToIndex(indexToMoveStartTimestamp(N)) resolves to N-1 exactly at a
+// move's start boundary (that instant is the tail of the previous move), so a
+// tiny forward nudge is needed to read back the move we actually landed on.
+function currentIndexAt(idx: AlgIndexerLike, timestamp: number): number {
+  return idx.timestampToIndex(timestamp + 1);
+}
+interface TwistyPropLike<T> {
+  get(): Promise<T>;
+  addFreshListener(listener: (value: T) => void): void;
+  removeFreshListener(listener: (value: T) => void): void;
+}
+type ReconstructionEl = TwistyEl & {
+  tempoScale: number;
+  timestamp: number;
+  play(): void;
+  pause(): void;
+  togglePlay(playing?: boolean): void;
+  jumpToStart(): void;
+  jumpToEnd(): void;
+  experimentalGet: { timestamp(): Promise<number> };
+  experimentalModel: {
+    indexer: TwistyPropLike<AlgIndexerLike>;
+    playingInfo: TwistyPropLike<{ playing: boolean }>;
+  };
+};
+
+export interface ReconstructionHandle {
+  play: () => void;
+  pause: () => void;
+  togglePlay: () => void;
+  jumpToStart: () => void;
+  jumpToEnd: () => void;
+  stepForward: () => void;
+  stepBackward: () => void;
+  jumpToMoveIndex: (index: number) => void;
+  seekFraction: (fraction: number) => void;
+  setTempo: (scale: number) => void;
+  rotate: (dLon: number, dLat: number) => void;
+}
+
+export interface ReconstructionProgress {
+  index: number;
+  total: number;
+  playing: boolean;
+  fraction: number;
+}
+
+export const ReconstructionPlayer = forwardRef<
+  ReconstructionHandle,
+  {
+    scramble: string;
+    solution: string;
+    puzzle?: string;
+    size?: number;
+    onProgress?: (p: ReconstructionProgress) => void;
+  }
+>(function ReconstructionPlayer({ scramble, solution, puzzle = '3x3x3', size = 320, onProgress }, ref) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const elRef = useRef<ReconstructionEl | null>(null);
+  const indexerRef = useRef<AlgIndexerLike | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const playingRef = useRef(false);
+  // The move index we last navigated to (or last polled while playing).
+  // Navigation actions read/update this directly instead of re-querying the
+  // player's async timestamp getter, so stepping never depends on an await.
+  const currentIndexRef = useRef(0);
+  const lon = useRef(35);
+  const lat = useRef(22);
+  const dragging = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+  const [grabbing, setGrabbing] = useState(false);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const el = document.createElement('twisty-player') as ReconstructionEl;
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.setAttribute('background', 'none');
+    el.setAttribute('control-panel', 'none');
+    el.setAttribute('visualization', 'PG3D');
+    el.setAttribute('camera-latitude', String(lat.current));
+    el.setAttribute('camera-longitude', String(lon.current));
+    wrap.appendChild(el);
+    elRef.current = el;
+    el.puzzle = puzzle;
+    el.visualization = 'PG3D';
+    el.experimentalSetupAlg = scramble;
+    el.alg = solution;
+
+    indexerRef.current = null;
+    playingRef.current = false;
+    currentIndexRef.current = 0;
+    el.experimentalModel.indexer.get().then((idx) => {
+      indexerRef.current = idx;
+      onProgress?.({ index: 0, total: idx.numAnimatedLeaves(), playing: false, fraction: 0 });
+    });
+    const onPlaying = (info: { playing: boolean }) => {
+      playingRef.current = info.playing;
+    };
+    el.experimentalModel.playingInfo.addFreshListener(onPlaying);
+
+    // Only poll the player's async timestamp getter while it's actually
+    // animating. While paused, cubing.js has no reason to re-derive that prop
+    // (nothing is driving its internal frame loop), so an in-flight await here
+    // can sit unresolved indefinitely — which would otherwise wedge this whole
+    // recursive rAF chain permanently, freezing the UI. Every explicit
+    // navigation action (step/seek/jump) reports progress synchronously
+    // instead, so paused-state accuracy never depends on this loop.
+    const tick = async () => {
+      if (playingRef.current && onProgress) {
+        const idx = indexerRef.current;
+        if (idx) {
+          try {
+            const ts = await el.experimentalGet.timestamp();
+            const total = idx.numAnimatedLeaves();
+            const duration = idx.algDuration();
+            const index = Math.min(total, Math.max(0, currentIndexAt(idx, ts)));
+            const fraction = duration > 0 ? Math.min(1, Math.max(0, ts / duration)) : 0;
+            currentIndexRef.current = index;
+            onProgress({ index, total, playing: playingRef.current, fraction });
+          } catch {
+            /* element may be mid-teardown */
+          }
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      el.experimentalModel.playingInfo.removeFreshListener(onPlaying);
+      wrap.innerHTML = '';
+      elRef.current = null;
+      indexerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scramble, solution, puzzle, size]);
+
+  useImperativeHandle(
+    ref,
+    (): ReconstructionHandle => ({
+      play: () => elRef.current?.play(),
+      pause: () => elRef.current?.pause(),
+      togglePlay: () => elRef.current?.togglePlay(),
+      jumpToStart: () => {
+        const el = elRef.current;
+        const idx = indexerRef.current;
+        if (!el || !idx) return;
+        el.pause();
+        el.jumpToStart();
+        currentIndexRef.current = 0;
+        onProgress?.({ index: 0, total: idx.numAnimatedLeaves(), playing: false, fraction: 0 });
+      },
+      jumpToEnd: () => {
+        const el = elRef.current;
+        const idx = indexerRef.current;
+        if (!el || !idx) return;
+        el.pause();
+        el.jumpToEnd();
+        const total = idx.numAnimatedLeaves();
+        currentIndexRef.current = total;
+        onProgress?.({ index: total, total, playing: false, fraction: 1 });
+      },
+      setTempo: (scale) => {
+        if (elRef.current) elRef.current.tempoScale = scale;
+      },
+      // Every navigation action below reads/updates currentIndexRef directly and
+      // reports progress synchronously — it never awaits the player's async
+      // timestamp getter. That getter is driven by cubing.js's own internal
+      // frame loop, which has no reason to resolve promptly (or at all) while
+      // paused, and stepping/scrubbing always pauses first (see below).
+      stepForward: () => {
+        const el = elRef.current;
+        const idx = indexerRef.current;
+        if (!el || !idx) return;
+        el.pause();
+        const total = idx.numAnimatedLeaves();
+        const target = currentIndexRef.current + 1;
+        currentIndexRef.current = Math.min(target, total);
+        if (target >= total) el.jumpToEnd();
+        else el.timestamp = idx.indexToMoveStartTimestamp(target);
+        onProgress?.({
+          index: currentIndexRef.current,
+          total,
+          playing: false,
+          fraction: total > 0 ? currentIndexRef.current / total : 0,
+        });
+      },
+      stepBackward: () => {
+        const el = elRef.current;
+        const idx = indexerRef.current;
+        if (!el || !idx) return;
+        el.pause();
+        const total = idx.numAnimatedLeaves();
+        const target = Math.max(currentIndexRef.current - 1, 0);
+        currentIndexRef.current = target;
+        if (target <= 0) el.jumpToStart();
+        else el.timestamp = idx.indexToMoveStartTimestamp(target);
+        onProgress?.({ index: target, total, playing: false, fraction: total > 0 ? target / total : 0 });
+      },
+      jumpToMoveIndex: (index) => {
+        const el = elRef.current;
+        const idx = indexerRef.current;
+        if (!el || !idx) return;
+        el.pause();
+        const total = idx.numAnimatedLeaves();
+        const target = Math.max(0, Math.min(index, total));
+        currentIndexRef.current = target;
+        if (target <= 0) el.jumpToStart();
+        else if (target >= total) el.jumpToEnd();
+        else el.timestamp = idx.indexToMoveStartTimestamp(target);
+        onProgress?.({ index: target, total, playing: false, fraction: total > 0 ? target / total : 0 });
+      },
+      seekFraction: (fraction) => {
+        const el = elRef.current;
+        const idx = indexerRef.current;
+        if (!el || !idx) return;
+        el.pause();
+        const clamped = Math.min(1, Math.max(0, fraction));
+        const total = idx.numAnimatedLeaves();
+        const target = Math.round(total * clamped);
+        currentIndexRef.current = target;
+        if (clamped <= 0) el.jumpToStart();
+        else if (clamped >= 1) el.jumpToEnd();
+        else el.timestamp = idx.algDuration() * clamped;
+        onProgress?.({ index: target, total, playing: false, fraction: clamped });
+      },
+      rotate: (dLon, dLat) => {
+        lon.current += dLon;
+        lat.current = Math.max(-89, Math.min(89, lat.current + dLat));
+        elRef.current?.setAttribute('camera-longitude', String(lon.current));
+        elRef.current?.setAttribute('camera-latitude', String(lat.current));
+      },
+    }),
+    [],
+  );
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    dragging.current = true;
+    setGrabbing(true);
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging.current || !elRef.current) return;
+    const dx = e.clientX - lastPos.current.x;
+    const dy = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    lon.current -= dx * 0.5;
+    lat.current = Math.max(-89, Math.min(89, lat.current + dy * 0.5));
+    elRef.current.setAttribute('camera-longitude', String(lon.current));
+    elRef.current.setAttribute('camera-latitude', String(lat.current));
+  };
+  const onPointerUp = () => {
+    dragging.current = false;
+    setGrabbing(false);
+  };
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      <div ref={wrapRef} />
+      <div
+        style={{ position: 'absolute', inset: 0, cursor: grabbing ? 'grabbing' : 'grab' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+      />
+    </div>
+  );
+});
