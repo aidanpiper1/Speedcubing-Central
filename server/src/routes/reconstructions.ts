@@ -14,7 +14,12 @@ const createSchema = z.object({
   solution: z.string().min(1).max(20000),
 });
 
-const renameSchema = z.object({ title: z.string().max(80) });
+const updateSchema = z.object({
+  title: z.string().max(80).optional(),
+  eventId: z.string().refine((id) => EVENT_IDS.includes(id), 'Invalid event').optional(),
+  scramble: z.string().max(2000).optional(),
+  solution: z.string().min(1).max(20000).optional(),
+});
 
 // GET /api/reconstructions — list current user's saved reconstructions
 router.get('/', requireAuth, async (req, res, next) => {
@@ -56,16 +61,16 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
   }
 });
 
-// PATCH /api/reconstructions/:id — rename
+// PATCH /api/reconstructions/:id — update (rename and/or replace scramble/solution/event)
 router.patch('/:id', requireAuth, async (req, res, next) => {
   try {
-    const { title } = renameSchema.parse(req.body);
+    const data = updateSchema.parse(req.body);
     const existing = await prisma.reconstruction.findUnique({ where: { id: req.params.id } });
     if (!existing || existing.userId !== req.user!.sub) {
       res.status(404).json({ error: 'Reconstruction not found' });
       return;
     }
-    const updated = await prisma.reconstruction.update({ where: { id: req.params.id }, data: { title } });
+    const updated = await prisma.reconstruction.update({ where: { id: req.params.id }, data });
     res.json(toReconstructionDTO(updated));
   } catch (e) {
     next(e);

@@ -31,6 +31,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const isTimer = location.pathname === '/timer';
   const isBattle = location.pathname.startsWith('/battle/');
+  const isReconstruction = location.pathname.startsWith('/reconstruction');
 
   const visible = NAV.filter((n) => (n.auth ? !!user : true));
 
@@ -128,7 +129,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className={clsx('p-4', (isTimer || isBattle) ? 'md:p-4' : 'max-w-6xl mx-auto md:p-8')}>{children}</div>
+        <div className={clsx('p-4', (isTimer || isBattle || isReconstruction) ? 'md:p-4' : 'max-w-6xl mx-auto md:p-8')}>{children}</div>
       </main>
 
       {/* Mobile bottom tab bar */}

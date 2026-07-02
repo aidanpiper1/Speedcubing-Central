@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { getEvent, type ReconstructionDTO } from '@scc/shared';
 import { PageHeader, EventSelector, EmptyState, Skeleton } from '../../components/ui';
 import { Icon } from '../../components/Icon';
+import { Modal } from '../../components/Modal';
 import { ReconstructionPlayer, type ReconstructionHandle, type ReconstructionProgress } from '../../components/CubeDiagram';
 import { api, apiError } from '../../lib/api';
 import { getScramble } from '../../lib/scramble';
@@ -30,6 +31,18 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Keeps the cube a good size at any viewport without ever overflowing its
+// column — recalculated on resize (e.g. toggling the sidebar).
+function useResponsiveCubeSize(): number {
+  const [size, setSize] = useState(() => (typeof window === 'undefined' ? 320 : window.innerWidth < 640 ? 240 : 340));
+  useEffect(() => {
+    const onResize = () => setSize(window.innerWidth < 640 ? 240 : 340);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return size;
+}
+
 export default function ReconstructionPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -46,6 +59,7 @@ export default function ReconstructionPage() {
 
   const [mine, setMine] = useState<ReconstructionDTO[]>([]);
   const [minePending, setMinePending] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
 
   const [progress, setProgress] = useState<ReconstructionProgress>({ index: 0, total: 0, playing: false, fraction: 0 });
   const [speed, setSpeed] = useState(1);
@@ -54,6 +68,7 @@ export default function ReconstructionPage() {
   const [timeInput, setTimeInput] = useState('');
 
   const handleRef = useRef<ReconstructionHandle>(null);
+  const cubeSize = useResponsiveCubeSize();
 
   // Load a saved reconstruction by id — this is the shareable-by-link path.
   useEffect(() => {
@@ -135,14 +150,27 @@ export default function ReconstructionPage() {
     copyText(`${origin}/reconstruction?${params.toString()}`, 'Share link copied');
   };
 
+  // Saves a brand new reconstruction the first time, then updates that same
+  // record in place on every subsequent save.
   const handleSave = async () => {
     if (!user || !solution.trim()) return;
     setSaving(true);
     try {
-      const { data } = await api.post<ReconstructionDTO>('/reconstructions', { title, eventId, scramble, solution });
-      setSavedId(data.id);
-      toast.success('Reconstruction saved');
-      navigate(`/reconstruction/${data.id}`, { replace: true });
+      if (savedId) {
+        const { data } = await api.patch<ReconstructionDTO>(`/reconstructions/${savedId}`, {
+          title,
+          eventId,
+          scramble,
+          solution,
+        });
+        setSavedId(data.id);
+        toast.success('Reconstruction updated');
+      } else {
+        const { data } = await api.post<ReconstructionDTO>('/reconstructions', { title, eventId, scramble, solution });
+        setSavedId(data.id);
+        toast.success('Reconstruction saved');
+        navigate(`/reconstruction/${data.id}`, { replace: true });
+      }
       fetchMine();
     } catch (e) {
       toast.error(apiError(e, 'Failed to save'));
@@ -157,6 +185,7 @@ export default function ReconstructionPage() {
     setScramble(r.scramble);
     setSolution(r.solution);
     setSavedId(r.id);
+    setShowSaved(false);
     navigate(`/reconstruction/${r.id}`);
   };
 
@@ -176,16 +205,31 @@ export default function ReconstructionPage() {
   };
 
   return (
-    <div>
-      <PageHeader title="Reconstruction" subtitle="3D playback of any scramble + solution, move by move." />
+    // The two-column layout only kicks in at lg+, so that's also where we pin
+    // the height to the viewport (each column scrolls internally instead of
+    // the whole page). Below lg the columns stack and the page scrolls normally.
+    <div className="flex flex-col gap-4 lg:h-[calc(100dvh-2rem)]">
+      <PageHeader
+        title="Reconstruction"
+        subtitle="3D playback of any scramble + solution, move by move."
+        action={
+          user && (
+            <button className="btn-ghost" onClick={() => setShowSaved(true)}>
+              <Icon name="book" size={16} />
+              My Reconstructions{mine.length > 0 ? ` (${mine.length})` : ''}
+            </button>
+          )
+        }
+      />
 
       {notFound && (
         <EmptyState title="Reconstruction not found" hint="This link may be invalid, or the reconstruction was deleted." />
       )}
 
       {!notFound && (
-        <div className="grid lg:grid-cols-[1fr_320px] gap-6 items-start">
-          <div className="space-y-6 min-w-0">
+        <div className="grid lg:grid-cols-[minmax(0,380px)_1fr] gap-6 flex-1 min-h-0">
+          {/* LEFT: inputs */}
+          <div className="space-y-6 min-w-0 min-h-0 overflow-y-auto">
             {loadingShared ? (
               <div className="card p-5 space-y-3">
                 <Skeleton className="h-5 w-1/3" />
@@ -194,21 +238,19 @@ export default function ReconstructionPage() {
               </div>
             ) : (
               <div className="card p-5 space-y-4">
-                <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
-                  <div>
-                    <label className="label">Title (optional)</label>
-                    <input
-                      className="input"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g. Sub-10 single"
-                      maxLength={80}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Event</label>
-                    <EventSelector value={eventId} onChange={setEventId} />
-                  </div>
+                <div>
+                  <label className="label">Title (optional)</label>
+                  <input
+                    className="input"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. Sub-10 single"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label className="label">Event</label>
+                  <EventSelector value={eventId} onChange={setEventId} />
                 </div>
 
                 <div>
@@ -236,7 +278,7 @@ export default function ReconstructionPage() {
                   <label className="label">Solution</label>
                   <textarea
                     className="input font-mono text-sm"
-                    rows={4}
+                    rows={6}
                     value={solution}
                     onChange={(e) => setSolution(e.target.value)}
                     placeholder="Paste or type the moves that solve the scramble above..."
@@ -245,117 +287,10 @@ export default function ReconstructionPage() {
               </div>
             )}
 
-            <div className="card p-6 flex flex-col items-center gap-5">
-              {title && <h2 className="font-bold text-lg text-center">{title}</h2>}
-
-              <ReconstructionPlayer
-                ref={handleRef}
-                scramble={scramble}
-                solution={solution}
-                puzzle={puzzle}
-                size={320}
-                onProgress={setProgress}
-              />
-
-              {moves.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <button className="btn-ghost !p-2" title="Jump to start" onClick={() => handleRef.current?.jumpToStart()}>
-                      <Icon name="skipBack" size={18} />
-                    </button>
-                    <button className="btn-ghost !p-2" title="Previous move" onClick={() => handleRef.current?.stepBackward()}>
-                      <Icon name="arrowLeft" size={18} />
-                    </button>
-                    <button
-                      className="btn-primary !px-5 !py-2.5"
-                      title={progress.playing ? 'Pause' : 'Play'}
-                      onClick={() => handleRef.current?.togglePlay()}
-                    >
-                      <Icon name={progress.playing ? 'pause' : 'play'} size={20} />
-                    </button>
-                    <button className="btn-ghost !p-2" title="Next move" onClick={() => handleRef.current?.stepForward()}>
-                      <Icon name="arrowRight" size={18} />
-                    </button>
-                    <button className="btn-ghost !p-2" title="Jump to end" onClick={() => handleRef.current?.jumpToEnd()}>
-                      <Icon name="skipForward" size={18} />
-                    </button>
-                  </div>
-
-                  <div className="w-full max-w-md flex items-center gap-3">
-                    <span className="text-xs text-muted font-mono w-12 text-right shrink-0">
-                      {progress.index}/{progress.total}
-                    </span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1000}
-                      value={Math.round(progress.fraction * 1000)}
-                      onChange={(e) => handleRef.current?.seekFraction(Number(e.target.value) / 1000)}
-                      className="flex-1 accent-accent"
-                    />
-                    <select
-                      className="input !w-auto !py-1 text-xs shrink-0"
-                      value={speed}
-                      onChange={(e) => {
-                        const s = Number(e.target.value);
-                        setSpeed(s);
-                        handleRef.current?.setTempo(s);
-                      }}
-                    >
-                      {SPEEDS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}×
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="w-full max-h-28 overflow-y-auto flex flex-wrap gap-1.5 justify-center px-1">
-                    {moves.map((m, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleRef.current?.jumpToMoveIndex(i)}
-                        className={clsx(
-                          'font-mono text-xs px-2 py-1 rounded transition-colors',
-                          i === progress.index
-                            ? 'bg-accent text-white'
-                            : i < progress.index
-                              ? 'bg-card-hover text-muted'
-                              : 'bg-card-hover text-gray-300 hover:bg-border',
-                        )}
-                      >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <div className="flex items-center gap-2 pt-4 border-t border-border w-full justify-center flex-wrap">
-                <button className="btn-ghost" onClick={handleShare}>
-                  <Icon name="copy" size={16} />
-                  Share
-                </button>
-                {user ? (
-                  <button className="btn-primary" onClick={handleSave} disabled={saving || !solution.trim()}>
-                    <Icon name="check" size={16} />
-                    {savedId ? 'Save as new' : saving ? 'Saving…' : 'Save to my account'}
-                  </button>
-                ) : (
-                  <span className="text-xs text-muted">
-                    <Link to="/login" className="text-accent font-semibold">
-                      Log in
-                    </Link>{' '}
-                    to save reconstructions to your account.
-                  </span>
-                )}
-              </div>
-            </div>
-
             {moves.length > 0 && (
               <div className="card p-5 space-y-4">
                 <h3 className="font-bold">Move Count & TPS</h3>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-5 gap-2">
                   {(
                     [
                       ['QTM', metrics.qtm],
@@ -365,9 +300,9 @@ export default function ReconstructionPage() {
                       ['ETM', metrics.etm],
                     ] as const
                   ).map(([label, value]) => (
-                    <div key={label} className="bg-card-hover rounded-lg p-3 text-center">
-                      <div className="text-xl font-bold">{value}</div>
-                      <div className="text-xs text-muted font-semibold mt-0.5">{label}</div>
+                    <div key={label} className="bg-card-hover rounded-lg p-2 text-center">
+                      <div className="text-lg font-bold">{value}</div>
+                      <div className="text-[10px] text-muted font-semibold mt-0.5">{label}</div>
                     </div>
                   ))}
                 </div>
@@ -394,46 +329,147 @@ export default function ReconstructionPage() {
             )}
           </div>
 
-          {user && (
-            <div className="card p-4">
-              <h3 className="font-bold mb-3">My Reconstructions</h3>
-              {minePending && (
-                <div className="space-y-2">
-                  <Skeleton className="h-14" />
-                  <Skeleton className="h-14" />
-                </div>
-              )}
-              {!minePending && mine.length === 0 && <p className="text-sm text-muted">Nothing saved yet.</p>}
-              <div className="space-y-2">
-                {mine.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => handleLoadSaved(r)}
-                    className={clsx(
-                      'w-full text-left p-3 rounded-lg border transition-colors flex items-start justify-between gap-2',
-                      savedId === r.id ? 'border-accent bg-accent/10' : 'border-border hover:bg-card-hover',
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <div className="font-semibold text-sm truncate">{r.title || 'Untitled'}</div>
-                      <div className="text-xs text-muted mt-0.5">
-                        {getEvent(r.eventId)?.name ?? r.eventId} · {formatDate(r.createdAt)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => handleDelete(r, e)}
-                      className="text-muted hover:text-red-400 shrink-0"
-                      title="Delete"
-                    >
-                      <Icon name="trash" size={16} />
-                    </button>
+          {/* RIGHT: 3D visualization + controls */}
+          <div className="card p-6 flex flex-col items-center gap-5 min-w-0 min-h-0 overflow-y-auto">
+            {title && <h2 className="font-bold text-lg text-center">{title}</h2>}
+
+            <ReconstructionPlayer
+              ref={handleRef}
+              scramble={scramble}
+              solution={solution}
+              puzzle={puzzle}
+              size={cubeSize}
+              onProgress={setProgress}
+            />
+
+            {moves.length > 0 && (
+              <>
+                <div className="flex items-center gap-2">
+                  <button className="btn-ghost !p-2" title="Jump to start" onClick={() => handleRef.current?.jumpToStart()}>
+                    <Icon name="skipBack" size={18} />
                   </button>
-                ))}
-              </div>
+                  <button className="btn-ghost !p-2" title="Previous move" onClick={() => handleRef.current?.stepBackward()}>
+                    <Icon name="arrowLeft" size={18} />
+                  </button>
+                  <button
+                    className="btn-primary !px-5 !py-2.5"
+                    title={progress.playing ? 'Pause' : 'Play'}
+                    onClick={() => handleRef.current?.togglePlay()}
+                  >
+                    <Icon name={progress.playing ? 'pause' : 'play'} size={20} />
+                  </button>
+                  <button className="btn-ghost !p-2" title="Next move" onClick={() => handleRef.current?.stepForward()}>
+                    <Icon name="arrowRight" size={18} />
+                  </button>
+                  <button className="btn-ghost !p-2" title="Jump to end" onClick={() => handleRef.current?.jumpToEnd()}>
+                    <Icon name="skipForward" size={18} />
+                  </button>
+                </div>
+
+                <div className="w-full max-w-md flex items-center gap-3">
+                  <span className="text-xs text-muted font-mono w-12 text-right shrink-0">
+                    {progress.index}/{progress.total}
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1000}
+                    value={Math.round(progress.fraction * 1000)}
+                    onChange={(e) => handleRef.current?.seekFraction(Number(e.target.value) / 1000)}
+                    className="flex-1 accent-accent"
+                  />
+                  <select
+                    className="input !w-auto !py-1 text-xs shrink-0"
+                    value={speed}
+                    onChange={(e) => {
+                      const s = Number(e.target.value);
+                      setSpeed(s);
+                      handleRef.current?.setTempo(s);
+                    }}
+                  >
+                    {SPEEDS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}×
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-full max-h-28 overflow-y-auto flex flex-wrap gap-1.5 justify-center px-1">
+                  {moves.map((m, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleRef.current?.jumpToMoveIndex(i)}
+                      className={clsx(
+                        'font-mono text-xs px-2 py-1 rounded transition-colors',
+                        i === progress.index
+                          ? 'bg-accent text-white'
+                          : i < progress.index
+                            ? 'bg-card-hover text-muted'
+                            : 'bg-card-hover text-gray-300 hover:bg-border',
+                      )}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center gap-2 pt-4 border-t border-border w-full justify-center flex-wrap">
+              <button className="btn-ghost" onClick={handleShare}>
+                <Icon name="copy" size={16} />
+                Share
+              </button>
+              {user ? (
+                <button className="btn-primary" onClick={handleSave} disabled={saving || !solution.trim()}>
+                  <Icon name="check" size={16} />
+                  {saving ? (savedId ? 'Updating…' : 'Saving…') : savedId ? 'Update' : 'Save to my account'}
+                </button>
+              ) : (
+                <span className="text-xs text-muted">
+                  <Link to="/login" className="text-accent font-semibold">
+                    Log in
+                  </Link>{' '}
+                  to save reconstructions to your account.
+                </span>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
+
+      <Modal open={showSaved} onClose={() => setShowSaved(false)} title="My Reconstructions" size="md">
+        {minePending && (
+          <div className="space-y-2">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
+        )}
+        {!minePending && mine.length === 0 && <p className="text-sm text-muted">Nothing saved yet.</p>}
+        <div className="space-y-2">
+          {mine.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => handleLoadSaved(r)}
+              className={clsx(
+                'w-full text-left p-3 rounded-lg border transition-colors flex items-start justify-between gap-2',
+                savedId === r.id ? 'border-accent bg-accent/10' : 'border-border hover:bg-card-hover',
+              )}
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-sm truncate">{r.title || 'Untitled'}</div>
+                <div className="text-xs text-muted mt-0.5">
+                  {getEvent(r.eventId)?.name ?? r.eventId} · {formatDate(r.createdAt)}
+                </div>
+              </div>
+              <button onClick={(e) => handleDelete(r, e)} className="text-muted hover:text-red-400 shrink-0" title="Delete">
+                <Icon name="trash" size={16} />
+              </button>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }
