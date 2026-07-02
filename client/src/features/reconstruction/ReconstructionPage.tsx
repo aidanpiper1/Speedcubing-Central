@@ -8,6 +8,7 @@ import { ReconstructionPlayer, type ReconstructionHandle, type ReconstructionPro
 import { api, apiError } from '../../lib/api';
 import { getScramble } from '../../lib/scramble';
 import { copyText } from '../../lib/clipboard';
+import { parseMoves, countMoveMetrics, calculateTps } from '../../lib/moveMetrics';
 import { useAuth } from '../../store/auth';
 import { toast } from '../../store/toast';
 
@@ -50,6 +51,7 @@ export default function ReconstructionPage() {
   const [speed, setSpeed] = useState(1);
   const [scrambling, setScrambling] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [timeInput, setTimeInput] = useState('');
 
   const handleRef = useRef<ReconstructionHandle>(null);
 
@@ -104,9 +106,11 @@ export default function ReconstructionPage() {
     fetchMine();
   }, [fetchMine]);
 
-  const canPlay = scramble.trim().length > 0 && solution.trim().length > 0;
   const puzzle = puzzleForEvent(eventId);
-  const moves = useMemo(() => solution.trim().split(/\s+/).filter(Boolean), [solution]);
+  const moves = useMemo(() => parseMoves(solution), [solution]);
+  const metrics = useMemo(() => countMoveMetrics(solution), [solution]);
+  const seconds = parseFloat(timeInput.replace(',', '.'));
+  const tps = calculateTps(metrics.htm, seconds);
 
   const handleGenerateScramble = async () => {
     setScrambling(true);
@@ -132,7 +136,7 @@ export default function ReconstructionPage() {
   };
 
   const handleSave = async () => {
-    if (!user || !canPlay) return;
+    if (!user || !solution.trim()) return;
     setSaving(true);
     try {
       const { data } = await api.post<ReconstructionDTO>('/reconstructions', { title, eventId, scramble, solution });
@@ -241,71 +245,71 @@ export default function ReconstructionPage() {
               </div>
             )}
 
-            {canPlay ? (
-              <div className="card p-6 flex flex-col items-center gap-5">
-                {title && <h2 className="font-bold text-lg text-center">{title}</h2>}
+            <div className="card p-6 flex flex-col items-center gap-5">
+              {title && <h2 className="font-bold text-lg text-center">{title}</h2>}
 
-                <ReconstructionPlayer
-                  ref={handleRef}
-                  scramble={scramble}
-                  solution={solution}
-                  puzzle={puzzle}
-                  size={320}
-                  onProgress={setProgress}
-                />
+              <ReconstructionPlayer
+                ref={handleRef}
+                scramble={scramble}
+                solution={solution}
+                puzzle={puzzle}
+                size={320}
+                onProgress={setProgress}
+              />
 
-                <div className="flex items-center gap-2">
-                  <button className="btn-ghost !p-2" title="Jump to start" onClick={() => handleRef.current?.jumpToStart()}>
-                    <Icon name="skipBack" size={18} />
-                  </button>
-                  <button className="btn-ghost !p-2" title="Previous move" onClick={() => handleRef.current?.stepBackward()}>
-                    <Icon name="arrowLeft" size={18} />
-                  </button>
-                  <button
-                    className="btn-primary !px-5 !py-2.5"
-                    title={progress.playing ? 'Pause' : 'Play'}
-                    onClick={() => handleRef.current?.togglePlay()}
-                  >
-                    <Icon name={progress.playing ? 'pause' : 'play'} size={20} />
-                  </button>
-                  <button className="btn-ghost !p-2" title="Next move" onClick={() => handleRef.current?.stepForward()}>
-                    <Icon name="arrowRight" size={18} />
-                  </button>
-                  <button className="btn-ghost !p-2" title="Jump to end" onClick={() => handleRef.current?.jumpToEnd()}>
-                    <Icon name="skipForward" size={18} />
-                  </button>
-                </div>
+              {moves.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button className="btn-ghost !p-2" title="Jump to start" onClick={() => handleRef.current?.jumpToStart()}>
+                      <Icon name="skipBack" size={18} />
+                    </button>
+                    <button className="btn-ghost !p-2" title="Previous move" onClick={() => handleRef.current?.stepBackward()}>
+                      <Icon name="arrowLeft" size={18} />
+                    </button>
+                    <button
+                      className="btn-primary !px-5 !py-2.5"
+                      title={progress.playing ? 'Pause' : 'Play'}
+                      onClick={() => handleRef.current?.togglePlay()}
+                    >
+                      <Icon name={progress.playing ? 'pause' : 'play'} size={20} />
+                    </button>
+                    <button className="btn-ghost !p-2" title="Next move" onClick={() => handleRef.current?.stepForward()}>
+                      <Icon name="arrowRight" size={18} />
+                    </button>
+                    <button className="btn-ghost !p-2" title="Jump to end" onClick={() => handleRef.current?.jumpToEnd()}>
+                      <Icon name="skipForward" size={18} />
+                    </button>
+                  </div>
 
-                <div className="w-full max-w-md flex items-center gap-3">
-                  <span className="text-xs text-muted font-mono w-12 text-right shrink-0">
-                    {progress.index}/{progress.total}
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1000}
-                    value={Math.round(progress.fraction * 1000)}
-                    onChange={(e) => handleRef.current?.seekFraction(Number(e.target.value) / 1000)}
-                    className="flex-1 accent-accent"
-                  />
-                  <select
-                    className="input !w-auto !py-1 text-xs shrink-0"
-                    value={speed}
-                    onChange={(e) => {
-                      const s = Number(e.target.value);
-                      setSpeed(s);
-                      handleRef.current?.setTempo(s);
-                    }}
-                  >
-                    {SPEEDS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}×
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div className="w-full max-w-md flex items-center gap-3">
+                    <span className="text-xs text-muted font-mono w-12 text-right shrink-0">
+                      {progress.index}/{progress.total}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1000}
+                      value={Math.round(progress.fraction * 1000)}
+                      onChange={(e) => handleRef.current?.seekFraction(Number(e.target.value) / 1000)}
+                      className="flex-1 accent-accent"
+                    />
+                    <select
+                      className="input !w-auto !py-1 text-xs shrink-0"
+                      value={speed}
+                      onChange={(e) => {
+                        const s = Number(e.target.value);
+                        setSpeed(s);
+                        handleRef.current?.setTempo(s);
+                      }}
+                    >
+                      {SPEEDS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}×
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                {moves.length > 0 && (
                   <div className="w-full max-h-28 overflow-y-auto flex flex-wrap gap-1.5 justify-center px-1">
                     {moves.map((m, i) => (
                       <button
@@ -324,30 +328,69 @@ export default function ReconstructionPage() {
                       </button>
                     ))}
                   </div>
-                )}
+                </>
+              )}
 
-                <div className="flex items-center gap-2 pt-4 border-t border-border w-full justify-center flex-wrap">
-                  <button className="btn-ghost" onClick={handleShare}>
-                    <Icon name="copy" size={16} />
-                    Share
+              <div className="flex items-center gap-2 pt-4 border-t border-border w-full justify-center flex-wrap">
+                <button className="btn-ghost" onClick={handleShare}>
+                  <Icon name="copy" size={16} />
+                  Share
+                </button>
+                {user ? (
+                  <button className="btn-primary" onClick={handleSave} disabled={saving || !solution.trim()}>
+                    <Icon name="check" size={16} />
+                    {savedId ? 'Save as new' : saving ? 'Saving…' : 'Save to my account'}
                   </button>
-                  {user ? (
-                    <button className="btn-primary" onClick={handleSave} disabled={saving}>
-                      <Icon name="check" size={16} />
-                      {savedId ? 'Save as new' : saving ? 'Saving…' : 'Save to my account'}
-                    </button>
-                  ) : (
-                    <span className="text-xs text-muted">
-                      <Link to="/login" className="text-accent font-semibold">
-                        Log in
-                      </Link>{' '}
-                      to save reconstructions to your account.
-                    </span>
+                ) : (
+                  <span className="text-xs text-muted">
+                    <Link to="/login" className="text-accent font-semibold">
+                      Log in
+                    </Link>{' '}
+                    to save reconstructions to your account.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {moves.length > 0 && (
+              <div className="card p-5 space-y-4">
+                <h3 className="font-bold">Move Count & TPS</h3>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                  {(
+                    [
+                      ['QTM', metrics.qtm],
+                      ['HTM', metrics.htm],
+                      ['STM', metrics.stm],
+                      ['QSTM', metrics.qstm],
+                      ['ETM', metrics.etm],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="bg-card-hover rounded-lg p-3 text-center">
+                      <div className="text-xl font-bold">{value}</div>
+                      <div className="text-xs text-muted font-semibold mt-0.5">{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-end gap-3 flex-wrap">
+                  <div>
+                    <label className="label">Your time (seconds)</label>
+                    <input
+                      className="input max-w-[140px]"
+                      value={timeInput}
+                      onChange={(e) => setTimeInput(e.target.value)}
+                      placeholder="e.g. 12.34"
+                      inputMode="decimal"
+                    />
+                  </div>
+                  {tps !== null && (
+                    <div className="bg-accent/15 text-accent rounded-lg px-4 py-2">
+                      <div className="text-2xl font-bold leading-tight">{tps.toFixed(2)}</div>
+                      <div className="text-xs font-semibold">TPS (HTM ÷ time)</div>
+                    </div>
                   )}
                 </div>
               </div>
-            ) : (
-              <EmptyState title="Enter a scramble and solution" hint="Fill in both fields above to load the 3D playback." />
             )}
           </div>
 
